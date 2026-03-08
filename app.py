@@ -50,14 +50,14 @@ show_help = st.toggle("📘 Show Help & User Guide", value=False)
 
 APP_VERSION  = "v1.5"
 LAST_UPDATED = "2026-02-03"
-COMPANY_NAME = "Paytm"   # <-- change only this if needed
+COMPANY_NAME =  # <-- change only this if needed
 
 # ---------- Title ----------
 c_logo, c_title = st.columns([1, 7])
 with c_logo:
     
     BASE_DIR = Path(__file__).resolve().parent
-    LOGO_PATH = BASE_DIR / "assets" / "paytm_logo.png"
+    LOGO_PATH = BASE_DIR / "assets" / "logo.png"
 
     if LOGO_PATH.exists():
         st.image(str(LOGO_PATH), width=140)
@@ -101,7 +101,7 @@ if show_help:
 
     st.markdown("""
     <div class="help-card">
-        <div class="help-title">📘 Paytm Reconciliation Suite – Help & User Guide</div>
+        <div class="help-title">📘 Reconciliation Suite – Help & User Guide</div>
         <div class="help-sub">
             This guide explains how to use the tool step by step, what file formats are supported,
             what features are available, and how to download outputs correctly.
@@ -828,7 +828,7 @@ def build_summary_pdf(pdf_path: Path, summary_df: pd.DataFrame, app_version: str
     styles = getSampleStyleSheet()
     story = []
 
-    title = Paragraph("<b>Paytm • Reconciliation Summary Report</b>", styles["Title"])
+    title = Paragraph("<b> • Reconciliation Summary Report</b>", styles["Title"])
     subtitle = Paragraph(
         f"Tool Version: {app_version}<br/>"
         f"Generated On: {datetime.now().strftime('%d-%b-%Y %I:%M %p')}<br/>"
@@ -887,7 +887,7 @@ def build_summary_pdf(pdf_path: Path, summary_df: pd.DataFrame, app_version: str
     story.append(Spacer(1, 14))
 
     footer = Paragraph(
-        "This report is generated from Paytm Reconciliation Suite and runs locally on the user machine.",
+        "This report is generated from Reconciliation Suite and runs locally on the user machine.",
         styles["Italic"]
     )
     story.append(footer)
@@ -2175,3 +2175,4 @@ if st.session_state["excel_ready_matched"] and st.session_state["excel_bytes_mat
         file_name="reco_output_MATCHED_only.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+

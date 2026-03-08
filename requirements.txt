@@ -1,0 +1,11 @@
+﻿streamlit
+pandas
+numpy
+duckdb
+pyarrow
+openpyxl
+xlsxwriter
+pyxlsb
+python-dateutil
+tzdata
+reportlab

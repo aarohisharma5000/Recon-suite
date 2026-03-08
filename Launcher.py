@@ -21,11 +21,11 @@ def app_base_dir() -> Path:
 
 BASE_DIR = app_base_dir()
 
-st.set_page_config(page_title="Paytm • Reco Suite Launcher", layout="wide")
+st.set_page_config(page_title= • Reco Suite Launcher", layout="wide")
 
 BASE = BASE_DIR  # ✅ use portable base
 ASSETS = BASE / "assets"
-LOGO_PATH = ASSETS / "paytm_logo.png"
+LOGO_PATH = ASSETS / "logo.png"
 
 # ✅ Standard portable folders (create if missing)
 DATA_DIR  = BASE / "data"
@@ -324,7 +324,7 @@ with hero_mid:
       <div class="heroRow" style="justify-content:center;">
         <div style="text-align:center;">
           <div class="heroTitle">
-            Paytm • Reconciliation Suite
+                • Reconciliation Suite
             <span class="heroVer">Launcher {LAUNCHER_VERSION}</span>
           </div>
           <div class="heroSub">
@@ -577,3 +577,4 @@ else:
         st.error(f"Tool file not found: {tool_path}")
     else:
         runpy.run_path(str(tool_path), run_name="__main__")
+

@@ -21,7 +21,7 @@ def app_base_dir() -> Path:
 
 BASE_DIR = app_base_dir()
 
-st.set_page_config(page_title= • Reco Suite Launcher", layout="wide")
+st.set_page_config(page_title= • "Reco Suite Launcher", layout="wide")
 
 BASE = BASE_DIR  # ✅ use portable base
 ASSETS = BASE / "assets"
@@ -577,4 +577,5 @@ else:
         st.error(f"Tool file not found: {tool_path}")
     else:
         runpy.run_path(str(tool_path), run_name="__main__")
+
 

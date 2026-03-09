@@ -232,20 +232,14 @@ def _safe_atomic_replace(tmp_path: Path, final_path: Path, retries: int = 12, sl
 
 APP_VERSION = "v2.0"
 LAST_UPDATED = "2026-02-17"
-COMPANY_NAME = "Paytm"
+COMPANY_NAME = "Reconciliation Suite"
 
 st.set_page_config(page_title="Reco Tool v2.0", layout="wide")
 
-show_help = st.toggle("📘 Show Help & User Guide", value=False)
+show_help = st.toggle("📘 Show Help & User Guide", value=False, key="toggle_help_tool2")
 
 
-c_logo, c_title = st.columns([1, 7])
-with c_logo:
-    # optional: keep your logo if present
-    if Path("paytm_logo.png").exists():
-        st.image("paytm_logo.png", width=140)
-with c_title:
-    st.title(f"📌 {COMPANY_NAME} • Reconciliation Tool • {APP_VERSION}")
+st.title(f"📌 {COMPANY_NAME} • Reconciliation Tool • {APP_VERSION}")
 
 st.info(
     f"🟢 **Version:** {APP_VERSION}   |   🕒 **Last Updated:** {LAST_UPDATED}   |   "
@@ -458,7 +452,7 @@ if show_help:
     st.subheader("📞 Support")
     st.info(
         "For issues, reach out to Finance Ops / tool owner.\n\n"
-        "Suggested contact: aarohi.sharma@paytm.com"
+        "Suggested contact: aarohisharma5000@gmail.com"
     )
 
 

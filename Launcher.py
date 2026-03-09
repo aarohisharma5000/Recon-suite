@@ -565,7 +565,6 @@ if back:
     st.rerun()
 
 html('<div class="divider"></div>')
-
 # ---------- run tool only after launch ----------
 if not st.session_state["launched"]:
     st.info("Select a tool, then click **Launch Selected Tool**.")
@@ -573,11 +572,13 @@ else:
     tool_key = st.session_state["selected_tool"]
     try:
         if tool_key == "tool1":
-            import app
-            app.main() if hasattr(app, 'main') else None
+            import importlib
+            import app as _app
+            importlib.reload(_app)
         elif tool_key == "tool2":
-            import app_v2
-            app_v2.main() if hasattr(app_v2, 'main') else None
+            import importlib
+            import app_v2 as _app2
+            importlib.reload(_app2)
     except Exception as e:
         st.error(f"Error loading tool: {e}")
 

@@ -1,5 +1,4 @@
 import streamlit as st 
-import runpy
 from pathlib import Path
 from datetime import datetime
 import importlib.util
@@ -347,7 +346,7 @@ s1, s2, s3, s4 = st.columns(4)
 s1.metric("Python", platform.python_version())
 s2.metric("OS", platform.system())
 s3.metric("Base Folder", BASE_DIR.name)
-s4.metric("URL", "http://localhost:8501")
+s4.metric("URL", "Cloud")
 
 with st.expander("📌 Environment Details", expanded=False):
     st.code(f"""BASE_DIR: {BASE_DIR}
@@ -576,7 +575,15 @@ else:
     if not tool_path.exists():
         st.error(f"Tool file not found: {tool_path}")
     else:
-        runpy.run_path(str(tool_path), run_name="__main__")
+        if not st.session_state["launched"]:
+            st.info("Select a tool, then click **Launch Selected Tool**.")
+    else:
+            tool_key = st.session_state["selected_tool"]
+            if tool_key == "tool1":
+                import app as tool_module
+            elif tool_key == "tool2":
+                import app_v2 as tool_module
+
 
 
 

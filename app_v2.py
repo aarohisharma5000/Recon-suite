@@ -142,7 +142,7 @@ def build_summary_pdf(pdf_path: Path, summary_df: pd.DataFrame, app_version: str
     styles = getSampleStyleSheet()
     story = []
 
-    title = Paragraph(f"<b>Paytm • Reconciliation Summary Report</b>", styles["Title"])
+    title = Paragraph(f"<b> • Reconciliation Summary Report</b>", styles["Title"])
     subtitle = Paragraph(
         f"Tool Version: {app_version}<br/>"
         f"Generated On: {datetime.now().strftime('%d-%b-%Y %I:%M %p')}<br/>"
@@ -177,7 +177,7 @@ def build_summary_pdf(pdf_path: Path, summary_df: pd.DataFrame, app_version: str
     story.append(Spacer(1, 14))
 
     footer = Paragraph(
-        "This report is generated from Paytm Reconciliation Suite and runs locally on the user machine.",
+        "This report is generated from Reconciliation Suite and runs on the cloud.",
         styles["Italic"]
     )
     story.append(footer)
@@ -274,7 +274,7 @@ if show_help:
 
     st.markdown("""
     <div class="help-card">
-        <div class="help-title">📘 Paytm Reconciliation Suite – Help & User Guide</div>
+        <div class="help-title">📘 Reconciliation Suite – Help & User Guide</div>
         <div class="help-sub">
             This guide explains how to use the tool step by step, what file formats are supported,
             what features are available, and how to download outputs correctly.
@@ -777,32 +777,70 @@ def write_json(path: Path, obj):
     path.write_text(json.dumps(obj, indent=2), encoding="utf-8")
 
 # ---------------------------
-# UI: Input discovery
+# UI: Input discovery (Cloud-compatible file uploader)
 # ---------------------------
-st.subheader("0) Big File Mode Inputs (Folder-based)")
+st.subheader("0) Big File Mode Inputs (Multi-File Upload)")
+
+cA, cB = st.columns(2)
+with cA:
+    uploads1 = st.file_uploader(
+        "Upload File 1 (multiple allowed)",
+        type=["csv", "xlsx", "xls", "xlsb"],
+        accept_multiple_files=True,
+        key="v2_file1"
+    )
+with cB:
+    uploads2 = st.file_uploader(
+        "Upload File 2 (multiple allowed)",
+        type=["csv", "xlsx", "xls", "xlsb"],
+        accept_multiple_files=True,
+        key="v2_file2"
+    )
+
+if not uploads1 or not uploads2:
+    st.info("Upload at least 1 file on both sides to start.")
+    st.stop()
+
+# Save uploaded files to input folders (so DuckDB/Parquet engine works unchanged)
+upload_sig1 = tuple((f.name, len(f.getvalue())) for f in uploads1)
+upload_sig2 = tuple((f.name, len(f.getvalue())) for f in uploads2)
+
+if st.session_state.get("v2_upload_sig1") != upload_sig1:
+    # Clear old files in folder
+    for old in IN_DIR_1.glob("*"):
+        try: old.unlink()
+        except: pass
+    for uf in uploads1:
+        (IN_DIR_1 / uf.name).write_bytes(uf.getvalue())
+    st.session_state["v2_upload_sig1"] = upload_sig1
+
+if st.session_state.get("v2_upload_sig2") != upload_sig2:
+    for old in IN_DIR_2.glob("*"):
+        try: old.unlink()
+        except: pass
+    for uf in uploads2:
+        (IN_DIR_2 / uf.name).write_bytes(uf.getvalue())
+    st.session_state["v2_upload_sig2"] = upload_sig2
 
 files1 = list_input_files(IN_DIR_1)
 files2 = list_input_files(IN_DIR_2)
 
-cA, cB = st.columns(2)
-with cA:
-    st.caption(f"File1 folder: {IN_DIR_1}")
+cA2, cB2 = st.columns(2)
+with cA2:
+    st.caption(f"File 1 — {len(files1)} file(s) loaded")
     st.dataframe(pd.DataFrame([{
         "File": f.name, "Ext": f.suffix.lower(),
         "Size_MB": round(f.stat().st_size/1024/1024, 2),
-        "Modified": datetime.fromtimestamp(f.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
     } for f in files1]), use_container_width=True)
-
-with cB:
-    st.caption(f"File2 folder: {IN_DIR_2}")
+with cB2:
+    st.caption(f"File 2 — {len(files2)} file(s) loaded")
     st.dataframe(pd.DataFrame([{
         "File": f.name, "Ext": f.suffix.lower(),
         "Size_MB": round(f.stat().st_size/1024/1024, 2),
-        "Modified": datetime.fromtimestamp(f.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
     } for f in files2]), use_container_width=True)
 
 if not files1 or not files2:
-    st.warning("Please place at least 1 file in BOTH folders: data/input/file1 and data/input/file2")
+    st.warning("Files not saved correctly. Please re-upload.")
     st.stop()
 
 sig1 = file_signature(files1)

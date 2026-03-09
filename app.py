@@ -41,7 +41,7 @@ from reportlab.lib.pagesizes import A4, landscape
 
 st.set_page_config(page_title="Reco Tool", layout="wide")
 
-show_help = st.toggle("📘 Show Help & User Guide", value=False)
+show_help = st.toggle("📘 Show Help & User Guide", value=False, key="toggle_help_tool1")
 
 
 # ============================================================
@@ -2164,6 +2164,7 @@ if st.session_state["excel_ready_matched"] and st.session_state["excel_bytes_mat
         file_name="reco_output_MATCHED_only.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
 
 
 

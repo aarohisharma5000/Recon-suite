@@ -53,18 +53,7 @@ LAST_UPDATED = "2026-02-03"
 COMPANY_NAME =  # <-- change only this if needed
 
 # ---------- Title ----------
-c_logo, c_title = st.columns([1, 7])
-with c_logo:
-    
-    BASE_DIR = Path(__file__).resolve().parent
-    LOGO_PATH = BASE_DIR / "assets" / "logo.png"
-
-    if LOGO_PATH.exists():
-        st.image(str(LOGO_PATH), width=140)
-    else:
-        st.warning(f"Logo missing: {LOGO_PATH}")
-with c_title:
-    st.title(f"📌 {COMPANY_NAME} • Reconciliation Tool (Multi-File Upload) • {APP_VERSION}")
+st.title(f"📌 {COMPANY_NAME} • Reconciliation Tool (Multi-File Upload) • {APP_VERSION}")
 
 # ---------- Version Banner ----------
 st.info(
@@ -279,7 +268,7 @@ if show_help:
     st.subheader("📞 Support")
     st.info(
         "For issues, reach out to Finance Ops / tool owner.\n\n"
-        "Suggested contact: aarohi.sharma@paytm.com"
+        "Suggested contact: aarohisharma5000@gmail.com"
     )
 
 
@@ -316,7 +305,7 @@ st.markdown(
     <div class="footer">
         <b>{COMPANY_NAME}</b> · Internal Use Only · Data stays on your machine (local processing).
         Do not share outputs externally without approval.
-        If issues occur, Connect :  Finance Ops. at aarohi.sharma@paytm.com
+        If issues occur, Connect :  Finance Ops. at aarohisharma5000@gmail.com
     </div>
     """,
     unsafe_allow_html=True
@@ -2175,4 +2164,5 @@ if st.session_state["excel_ready_matched"] and st.session_state["excel_bytes_mat
         file_name="reco_output_MATCHED_only.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
 

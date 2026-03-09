@@ -566,23 +566,20 @@ if back:
 
 html('<div class="divider"></div>')
 
-
 # ---------- run tool only after launch ----------
 if not st.session_state["launched"]:
     st.info("Select a tool, then click **Launch Selected Tool**.")
 else:
-    tool_path = t["path"]
-    if not tool_path.exists():
-        st.error(f"Tool file not found: {tool_path}")
-    else:
-        if not st.session_state["launched"]:
-            st.info("Select a tool, then click **Launch Selected Tool**.")
-    else:
-            tool_key = st.session_state["selected_tool"]
-            if tool_key == "tool1":
-                import app as tool_module
-            elif tool_key == "tool2":
-                import app_v2 as tool_module
+    tool_key = st.session_state["selected_tool"]
+    try:
+        if tool_key == "tool1":
+            import app
+            app.main() if hasattr(app, 'main') else None
+        elif tool_key == "tool2":
+            import app_v2
+            app_v2.main() if hasattr(app_v2, 'main') else None
+    except Exception as e:
+        st.error(f"Error loading tool: {e}")
 
 
 

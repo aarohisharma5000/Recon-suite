@@ -50,7 +50,7 @@ show_help = st.toggle("📘 Show Help & User Guide", value=False)
 
 APP_VERSION  = "v1.5"
 LAST_UPDATED = "2026-02-03"
-COMPANY_NAME =  # <-- change only this if needed
+COMPANY_NAME = "Reconciliation Suite"
 
 # ---------- Title ----------
 st.title(f"📌 {COMPANY_NAME} • Reconciliation Tool (Multi-File Upload) • {APP_VERSION}")
@@ -2164,5 +2164,6 @@ if st.session_state["excel_ready_matched"] and st.session_state["excel_bytes_mat
         file_name="reco_output_MATCHED_only.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
 
 

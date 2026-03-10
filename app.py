@@ -1121,14 +1121,22 @@ def _norm_name(x: str) -> str:
 common_map = { _norm_name(c): c for c in common_cols }
 
 # ✅ Step 1: check which priority candidates exist in both files
+def _dedup(lst):
+    seen = set(); out = []
+    for x in lst:
+        if x not in seen: seen.add(x); out.append(x)
+    return out
+
 existing_key_candidates = []
 for cand in KEY_CANDIDATES_PRIORITY:
     k = _norm_name(cand)
     if k in common_map:
         existing_key_candidates.append(common_map[k])
+# ✅ Dedup immediately — KEY_CANDIDATES_PRIORITY may map to same actual column
+existing_key_candidates = _dedup(existing_key_candidates)
 
 # ✅ Step 2: if none found, smart-suggest from column names
-auto_suggest = existing_key_candidates if existing_key_candidates else suggest_key_candidates(common_cols, top_k=5)
+auto_suggest = existing_key_candidates if existing_key_candidates else _dedup(suggest_key_candidates(common_cols, top_k=5))
 
 st.markdown("### 🔑 Key Column (used for matching rows)")
 
@@ -1147,22 +1155,33 @@ with st.expander("ℹ️ How COALESCE key works"):
     )
 
 # ✅ Step 3: User can select / override key columns from ALL common columns
+# Deduplicate auto_suggest so same column doesn't appear twice in default
+auto_suggest = _dedup(auto_suggest)
+
+# ✅ Deduplicate default — ensure same column name never appears twice
+_safe_default = []
+_seen_default = set()
+for c in auto_suggest:
+    if c in common_cols and c not in _seen_default:
+        _seen_default.add(c)
+        _safe_default.append(c)
+
 key_cols_sel = st.multiselect(
     "Select key column(s) — COALESCE priority follows order below",
-    options=common_cols,
-    default=auto_suggest
+    options=_dedup(common_cols),
+    default=_safe_default
 )
 
 priority_text = st.text_input(
     "Key priority order (comma-separated, left = highest priority). Edit if needed.",
-    value=", ".join(key_cols_sel) if key_cols_sel else ", ".join(auto_suggest)
+    value=", ".join(_dedup(key_cols_sel)) if key_cols_sel else ", ".join(auto_suggest)
 )
 
-priority_list = [x.strip() for x in priority_text.split(",") if x.strip()]
+priority_list = _dedup([x.strip() for x in priority_text.split(",") if x.strip()])
 _allowed_keys = set(key_cols_sel) if key_cols_sel else set(existing_key_candidates)
-existing_key_candidates = [c for c in priority_list if c in common_cols and c in _allowed_keys]
+existing_key_candidates = _dedup([c for c in priority_list if c in common_cols and c in _allowed_keys])
 if not existing_key_candidates:
-    existing_key_candidates = [c for c in (key_cols_sel or auto_suggest) if c in common_cols]
+    existing_key_candidates = _dedup([c for c in (key_cols_sel or auto_suggest) if c in common_cols])
 
 if not existing_key_candidates:
     st.warning("⚠️ No key selected yet. Please select at least one key column above.")
@@ -1374,6 +1393,10 @@ with c2:
             options=compare_cols if compare_cols else common_cols,
             index=0 if compare_cols else 0
         )
+        # ✅ Move selected Particular column to FRONT of compare list (first in output columns)
+        if reco_focus_col and reco_focus_col in compare_cols:
+            rest = [c for c in compare_cols if c != reco_focus_col]
+            compare_cols = [reco_focus_col] + rest
     else:
         compare_cols = common_cols
         reco_focus_col = st.selectbox(
@@ -2114,8 +2137,11 @@ if st.button("📦 Prepare ZIP (All CSVs)", disabled=st.session_state["csv_ready
         b_only1   = _df_to_csv_bytes(run_sig + "|ZIP_ONLY1", only_f1_out)
         b_only2   = _df_to_csv_bytes(run_sig + "|ZIP_ONLY2", only_f2_out)
 
+        b_summary = summary_df.to_csv(index=False).encode("utf-8")
+
         zbio = io.BytesIO()
         with zipfile.ZipFile(zbio, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("reco_summary.csv", b_summary)          # ✅ Summary CSV added
             if summary_pdf_bytes:
                 zf.writestr("summary_report.pdf", summary_pdf_bytes)
             zf.writestr("reco_matched.csv", b_matched)

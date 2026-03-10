@@ -565,7 +565,38 @@ KEY_CANDIDATES_PRIORITY = [
     "loan account number",
     "loanaccountnumber",
     "lenderloanaccountnumber",
+    "parent loan account number",
+    "loan acct number",
+    "loan acc number",
+    "account number",
+    "customer id",
+    "loan id",
+    "lender account number",
 ]
+
+# Smart key suggestion (scans column names, returns best-guess key cols)
+_KEY_HINTS = [
+    "lenderloanaccountnumber", "loanaccountnumber", "loanacctnumber",
+    "loanaccnumber", "lan", "accountnumber", "loanid", "lenderaccountnumber",
+    "customerid", "borrowerid", "accountid",
+]
+
+def suggest_key_candidates(cols: list, top_k: int = 5) -> list:
+    """Score column names and return best-guess key columns."""
+    scored = []
+    for c in cols:
+        n = re.sub(r"[^a-z0-9]+", "", str(c).strip().lower())
+        score = 0
+        for h in _KEY_HINTS:
+            if h in n:
+                score += 10
+        if n.endswith("id") or n.endswith("number"):
+            score += 2
+        if any(x in n for x in ["date", "amount", "sum", "balance", "rate"]):
+            score -= 5
+        scored.append((score, c))
+    scored.sort(key=lambda x: (-x[0], str(x[1]).lower()))
+    return [c for sc, c in scored if sc >= 2][:top_k]
 
 def _norm_col_name(x: str):
     x = str(x).replace("\u00A0", " ").replace("\u200B", "")
@@ -1077,7 +1108,7 @@ if not common_cols:
     st.stop()
 
 # -----------------------------
-# ✅ COALESCE KEY MODE (replaces "Forced Key Column")
+# ✅ COALESCE KEY MODE — Smart user-selectable key (from app_v2 logic)
 # -----------------------------
 def _norm_name(x: str) -> str:
     x = str(x).replace("\u00A0", " ").replace("\u200B", "")
@@ -1085,23 +1116,59 @@ def _norm_name(x: str) -> str:
     x = x.strip().lower()
     x = re.sub(r"\s+", " ", x)
     x_no_space = x.replace(" ", "")
-    return x_no_space  # compare on no-space lowercase
+    return x_no_space
 
-common_map = { _norm_name(c): c for c in common_cols }  # normalized -> actual
+common_map = { _norm_name(c): c for c in common_cols }
+
+# ✅ Step 1: check which priority candidates exist in both files
 existing_key_candidates = []
 for cand in KEY_CANDIDATES_PRIORITY:
     k = _norm_name(cand)
     if k in common_map:
         existing_key_candidates.append(common_map[k])
 
-if not existing_key_candidates:
-    st.error(
-        "Key not found. Please ensure one of these columns exists in BOTH sides: "
-        "Lender Loan Account Number / loan account number / Loan Account Number"
+# ✅ Step 2: if none found, smart-suggest from column names
+auto_suggest = existing_key_candidates if existing_key_candidates else suggest_key_candidates(common_cols, top_k=5)
+
+st.markdown("### 🔑 Key Column (used for matching rows)")
+
+if existing_key_candidates:
+    st.success("✅ Default key column(s) found → " + " / ".join(existing_key_candidates))
+else:
+    st.warning(
+        "Default key names not found. "
+        "Please select the correct key column(s) from the list below."
     )
+
+with st.expander("ℹ️ How COALESCE key works"):
+    st.write(
+        "The tool builds a single _KEY as the first non-blank value from your selected "
+        "key columns (in the order shown). This handles files where one column may be blank."
+    )
+
+# ✅ Step 3: User can select / override key columns from ALL common columns
+key_cols_sel = st.multiselect(
+    "Select key column(s) — COALESCE priority follows order below",
+    options=common_cols,
+    default=auto_suggest
+)
+
+priority_text = st.text_input(
+    "Key priority order (comma-separated, left = highest priority). Edit if needed.",
+    value=", ".join(key_cols_sel) if key_cols_sel else ", ".join(auto_suggest)
+)
+
+priority_list = [x.strip() for x in priority_text.split(",") if x.strip()]
+_allowed_keys = set(key_cols_sel) if key_cols_sel else set(existing_key_candidates)
+existing_key_candidates = [c for c in priority_list if c in common_cols and c in _allowed_keys]
+if not existing_key_candidates:
+    existing_key_candidates = [c for c in (key_cols_sel or auto_suggest) if c in common_cols]
+
+if not existing_key_candidates:
+    st.warning("⚠️ No key selected yet. Please select at least one key column above.")
     st.stop()
 
-st.success("✅ Key Mode: COALESCE (first non-blank) → " + " / ".join(existing_key_candidates))
+st.info("✅ Key Mode: COALESCE → " + " / ".join(existing_key_candidates))
 
 # -----------------------------
 # 🔎 Key Validation (Detected Key Column(s) + Raw vs Clean Preview)

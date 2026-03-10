@@ -991,7 +991,7 @@ if st.session_state.get("files_sig") != sig:
         "only_f1_out", "only_f2_out",
         "dup_rows_1_out", "dup_rows_2_out", "dup_both_out",
         "miss_cols_f1", "miss_cols_f2",
-        "f1_summary", "f2_summary"
+        # ✅ f1_summary / f2_summary NOT deleted here — they are set by read_many above
     ]:
         if k in st.session_state:
             del st.session_state[k]
@@ -2013,6 +2013,16 @@ run_sig = (
 # ==================================================
 st.markdown("### ⚡ Super Fast CSV Downloads (Huge Rows)")
 st.caption("CSV is fastest for very large outputs. No formatting, only raw data.")
+
+# ✅ Summary CSV (always available immediately)
+st.markdown("**📋 Summary (CSV)**")
+summary_csv_bytes = summary_df.to_csv(index=False).encode("utf-8")
+st.download_button(
+    "⬇ Download Summary (CSV)",
+    data=summary_csv_bytes,
+    file_name="reco_summary.csv",
+    mime="text/csv"
+)
 
 # Init CSV session keys
 for k in [

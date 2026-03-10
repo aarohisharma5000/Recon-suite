@@ -1428,6 +1428,87 @@ if compare_mode == "Compare selected columns" and not compare_cols:
     st.warning("Please select at least one column to compare.")
     st.stop()
 
+# ============================================================
+# 🧹 Optional Filter — run reco on a SUBSET of rows
+# ============================================================
+st.markdown("### 🧹 Optional Filter (run reco on subset)")
+st.caption("Example: if you have a Lender ID column in both files, filter to run reco only for one lender.")
+
+filter_enabled = st.checkbox("Enable filter (applied on BOTH sides before reco)", value=False)
+
+# Smart default: try to find a lender-like column
+_filter_candidates = [
+    "lender_id", "lender", "lender code", "lender_code",
+    "lender name", "lender_name", "partner_id", "partner",
+    "merchant_id", "merchant"
+]
+_filter_default = None
+_common_lower = {c.strip().lower(): c for c in common_cols}
+for _cand in _filter_candidates:
+    if _cand.lower() in _common_lower:
+        _filter_default = _common_lower[_cand.lower()]
+        break
+if _filter_default is None and common_cols:
+    _filter_default = common_cols[0]
+
+_filter_col_idx = common_cols.index(_filter_default) if _filter_default in common_cols else 0
+filter_col = st.selectbox("Filter column", options=common_cols, index=_filter_col_idx)
+
+# Show unique value picker + manual text entry
+picked_values = []
+if filter_enabled:
+    use_picker = st.checkbox("Show available values (dropdown)", value=True)
+    if use_picker:
+        @st.cache_data(show_spinner=False)
+        def _get_unique_filter_vals(_sig, col, limit=5000):
+            """Get unique values from df1+df2 for the filter column (cached by upload sig)."""
+            vals = []
+            for _df in [df1, df2]:
+                if col in _df.columns:
+                    for v in _df[col].dropna().astype(str).str.strip().unique():
+                        if v and v not in vals:
+                            vals.append(v)
+                        if len(vals) >= limit:
+                            return vals, True
+            vals.sort()
+            return vals, False
+
+        _fvals, _truncated = _get_unique_filter_vals(
+            st.session_state.get("files_sig", ""), filter_col
+        )
+        if _truncated:
+            st.info("Showing first 5,000 unique values. You can still type values manually below.")
+        if not _fvals:
+            st.info("No values found for this column.")
+        picked_values = st.multiselect(
+            "Pick filter value(s) (case-insensitive match)",
+            options=_fvals,
+            default=[]
+        )
+
+filter_value_raw = st.text_area(
+    "Filter value(s) — one per line or comma-separated (case-insensitive, exact match after trim)",
+    value="",
+    height=90,
+    placeholder="Example:\n85\n86\n87   (or  85, 86, 87)"
+)
+
+_tmp_vals = []
+for _part in filter_value_raw.replace(",", "\n").splitlines():
+    _v = _part.strip()
+    if _v and _v not in _tmp_vals:
+        _tmp_vals.append(_v)
+filter_values = _tmp_vals
+for _v in (picked_values or []):
+    _vv = str(_v).strip()
+    if _vv and _vv not in filter_values:
+        filter_values.append(_vv)
+
+if filter_enabled and not filter_values:
+    st.warning("⚠️ Filter is enabled but no value entered. Please add at least one value or disable the filter.")
+elif filter_enabled and filter_values:
+    st.caption(f"✅ Filter will apply on **{len(filter_values)}** value(s) → column: **{filter_col}**")
+
 # -----------------------------
 # ✅ 2.5) Selected Field Summary (before Run) — FIXED TO MATCH RUN LOGIC + COALESCE KEY
 # -----------------------------
@@ -1511,6 +1592,12 @@ if not st.session_state["run_done"]:
 # ✅ Prevent "loop" on downloads: cache RUN outputs in session_state
 # Any click (download/button) reruns Streamlit. So we reuse computed outputs.
 # -----------------------------
+_filter_sig = (
+    str(filter_enabled) + "|" +
+    (filter_col if filter_enabled else "") + "|" +
+    ",".join(sorted([str(v).strip().upper() for v in filter_values])) if filter_enabled else "nofilter"
+)
+
 run_inputs_sig = (
     str(st.session_state.get("files_sig")) + "|" +
     str(reco_focus_col) + "|" +
@@ -1518,7 +1605,8 @@ run_inputs_sig = (
     ",".join(list(compare_cols)) + "|" +
     str(float(numeric_tolerance)) + "|" +
     str(bool(treat_blanks_as_equal)) + "|" +
-    str(bool(skip_mismatch_columns))
+    str(bool(skip_mismatch_columns)) + "|" +
+    _filter_sig
 )
 
 RUN_CACHE_KEYS = [
@@ -1579,6 +1667,22 @@ if not skip_recompute:
 
     df1_raw = df1.copy()
     df2_raw = df2.copy()
+
+    # ✅ Apply optional filter to BOTH sides before reco
+    if filter_enabled and filter_values and filter_col:
+        _fvals_upper = [str(v).strip().upper() for v in filter_values if str(v).strip()]
+        if _fvals_upper:
+            # resolve actual column name case-insensitively
+            _f1_col = next((c for c in df1_raw.columns if c.strip().lower() == filter_col.strip().lower()), None)
+            _f2_col = next((c for c in df2_raw.columns if c.strip().lower() == filter_col.strip().lower()), None)
+            if _f1_col:
+                df1_raw = df1_raw[df1_raw[_f1_col].astype(str).str.strip().str.upper().isin(_fvals_upper)].copy()
+            if _f2_col:
+                df2_raw = df2_raw[df2_raw[_f2_col].astype(str).str.strip().str.upper().isin(_fvals_upper)].copy()
+            st.info(f"🔍 Filter applied: **{filter_col}** IN {_fvals_upper[:5]}{'...' if len(_fvals_upper)>5 else ''} → File1: {len(df1_raw):,} rows | File2: {len(df2_raw):,} rows")
+            if df1_raw.empty or df2_raw.empty:
+                st.error("⚠️ Filter returned 0 rows on one or both sides. Please check your filter value.")
+                st.stop()
 
     raw1, src1 = build_effective_key(df1_raw, KEY_CANDIDATES_PRIORITY)
     raw2, src2 = build_effective_key(df2_raw, KEY_CANDIDATES_PRIORITY)

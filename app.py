@@ -1268,67 +1268,61 @@ if search_lan:
     def build_clean_key_set(df: pd.DataFrame, candidates: list, chunk_size: int = 200000) -> set:
         """
         Build a set of CLEANED coalesced keys for quick membership checks.
-
-        For large files, this can be heavy. We chunk + show progress.
         """
         raw_key, _ = build_effective_key(df, candidates)
         n = len(raw_key)
         out = set()
         if n == 0:
             return out
-
         prog = st.progress(0, text="Building key index for search...")
         for start in range(0, n, chunk_size):
             end = min(start + chunk_size, n)
             chunk = raw_key.iloc[start:end]
             cleaned = clean_key_series(chunk, treat_as_text=True)
-            # add non-blank keys
             out.update([k for k in cleaned.tolist() if k])
             prog.progress(int(end * 100 / n), text=f"Building key index for search... {end:,}/{n:,}")
         prog.empty()
         return out
 
-    # Build / reuse cached sets (so we don't recompute every rerun)
-    # We key the cache to upload signature + selected candidates
+    # ── Cache key: upload sig + candidates
     _sig = st.session_state.get("upload_signature", "")
     _cand_sig = "|".join(existing_key_candidates)
 
-    need_build = True
+    index_ready = False
     if "search_key_index_meta" in st.session_state:
         meta = st.session_state["search_key_index_meta"]
         if meta.get("sig") == _sig and meta.get("cand_sig") == _cand_sig:
-            need_build = False
+            index_ready = True
 
-    if need_build:
-        st.info("To check if this key exists in both sides, click **Build Search Index** (one-time per upload).")
+    # ── AUTO-BUILD: trigger silently when user types a key (no button needed)
+    if not index_ready:
+        with st.spinner("Building search index (one-time for this upload)…"):
+            st.session_state["search_key_set_1"] = build_clean_key_set(df1, existing_key_candidates)
+            st.session_state["search_key_set_2"] = build_clean_key_set(df2, existing_key_candidates)
+            st.session_state["search_key_index_meta"] = {"sig": _sig, "cand_sig": _cand_sig}
+            index_ready = True
 
-        if st.button("🔎 Build Search Index", type="primary"):
-            with st.spinner("Building cleaned key index for both files (one-time)..."):
-                st.session_state["search_key_set_1"] = build_clean_key_set(df1, existing_key_candidates)
-                st.session_state["search_key_set_2"] = build_clean_key_set(df2, existing_key_candidates)
-                st.session_state["search_key_index_meta"] = {"sig": _sig, "cand_sig": _cand_sig}
-            st.success("✅ Search index built. Now type a key again (or retype) to check presence.")
-    else:
-        s1 = st.session_state.get("search_key_set_1", set())
-        s2 = st.session_state.get("search_key_set_2", set())
+    # ── LOOKUP — always show result immediately after typing
+    s1 = st.session_state.get("search_key_set_1", set())
+    s2 = st.session_state.get("search_key_set_2", set())
 
-        in1 = _clean_in in s1
-        in2 = _clean_in in s2
+    in1 = _clean_in in s1
+    in2 = _clean_in in s2
 
-        cA, cB, cC = st.columns(3)
-        with cA:
-            st.metric("Exists in File 1", "✅ Yes" if in1 else "❌ No")
-        with cB:
-            st.metric("Exists in File 2", "✅ Yes" if in2 else "❌ No")
-        with cC:
-            if in1 and in2:
-                st.success("✅ Present in BOTH files (after cleaning).")
-            elif in1 and not in2:
-                st.warning("⚠️ Present only in File 1 (after cleaning).")
-            elif (not in1) and in2:
-                st.warning("⚠️ Present only in File 2 (after cleaning).")
-            else:
-                st.error("❌ Not found in either file (after cleaning).")
+    cA, cB, cC = st.columns(3)
+    with cA:
+        st.metric("Exists in File 1", "✅ Yes" if in1 else "❌ No")
+    with cB:
+        st.metric("Exists in File 2", "✅ Yes" if in2 else "❌ No")
+    with cC:
+        if in1 and in2:
+            st.success("✅ Present in BOTH files (after cleaning).")
+        elif in1 and not in2:
+            st.warning("⚠️ Present only in File 1 (after cleaning).")
+        elif (not in1) and in2:
+            st.warning("⚠️ Present only in File 2 (after cleaning).")
+        else:
+            st.error("❌ Not found in either file (after cleaning).")
 
 
 # Keep a display label (not used alone for key build)

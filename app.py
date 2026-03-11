@@ -2125,6 +2125,38 @@ label.success("✅ Completed")
 
 st.subheader("6) Download")
 
+# ── 📦 Total Download Size Badge — covers ALL prepared files (CSV + Excel)
+#    Updates live as user prepares each file
+_total_bytes = 0
+for _key in [
+    "csv_bytes_matched", "csv_bytes_mismatched",
+    "csv_bytes_only_f1", "csv_bytes_only_f2",
+    "csv_bytes_zip_all",
+    "excel_bytes_main", "excel_bytes_matched",
+]:
+    _b = st.session_state.get(_key)
+    if _b is not None:
+        _total_bytes += len(_b)
+# Summary CSV is always generated inline — add its size too
+_total_bytes += len(summary_df.to_csv(index=False).encode("utf-8"))
+
+_total_mb = _total_bytes / (1024 * 1024)
+_badge_color = "#198754" if _total_mb < 50 else ("#fd7e14" if _total_mb < 200 else "#dc3545")
+st.markdown(
+    f"""<div style="
+        display:inline-block;
+        background:{_badge_color};
+        color:white;
+        padding:6px 14px;
+        border-radius:10px;
+        font-size:13px;
+        font-weight:700;
+        margin-bottom:4px;
+    ">📦 Total prepared download size: {_total_mb:,.2f} MB</div>""",
+    unsafe_allow_html=True
+)
+st.caption("Size updates as you prepare each file below.")
+
 summary_pdf_bytes = out_summary_pdf.read_bytes() if out_summary_pdf.exists() else b""
 
 if summary_pdf_bytes:
@@ -2190,9 +2222,11 @@ with st.expander("📋 Summary CSV", expanded=True):
 # ── ✅ Matched
 with st.expander(f"✅ Matched CSV  —  {len(matched_out):,} rows", expanded=False):
     if st.button("📄 Prepare Matched CSV", disabled=st.session_state["csv_ready_matched"], key="btn_prep_matched"):
-        with st.spinner("Building Matched CSV…"):
-            st.session_state["csv_bytes_matched"] = _df_to_csv_bytes(run_sig + "|CSV_MATCHED", matched_out)
-            st.session_state["csv_ready_matched"] = True
+        _ep = st.progress(0, text="Building Matched CSV…")
+        _ep.progress(30, text="Serialising rows…")
+        st.session_state["csv_bytes_matched"] = _df_to_csv_bytes(run_sig + "|CSV_MATCHED", matched_out)
+        _ep.progress(100, text="✅ Done")
+        st.session_state["csv_ready_matched"] = True
     if st.session_state["csv_ready_matched"] and st.session_state["csv_bytes_matched"] is not None:
         st.download_button(
             "⬇ Download Matched (CSV)",
@@ -2205,9 +2239,11 @@ with st.expander(f"✅ Matched CSV  —  {len(matched_out):,} rows", expanded=Fa
 # ── ❌ Mismatched
 with st.expander(f"❌ Mismatched CSV  —  {len(mismatched_out):,} rows", expanded=True):
     if st.button("📄 Prepare Mismatched CSV", disabled=st.session_state["csv_ready_mismatched"], key="btn_prep_mism"):
-        with st.spinner("Building Mismatched CSV…"):
-            st.session_state["csv_bytes_mismatched"] = _df_to_csv_bytes(run_sig + "|CSV_MISMATCHED", mismatched_out)
-            st.session_state["csv_ready_mismatched"] = True
+        _ep = st.progress(0, text="Building Mismatched CSV…")
+        _ep.progress(30, text="Serialising rows…")
+        st.session_state["csv_bytes_mismatched"] = _df_to_csv_bytes(run_sig + "|CSV_MISMATCHED", mismatched_out)
+        _ep.progress(100, text="✅ Done")
+        st.session_state["csv_ready_mismatched"] = True
     if st.session_state["csv_ready_mismatched"] and st.session_state["csv_bytes_mismatched"] is not None:
         st.download_button(
             "⬇ Download Mismatched (CSV)",
@@ -2220,9 +2256,11 @@ with st.expander(f"❌ Mismatched CSV  —  {len(mismatched_out):,} rows", expan
 # ── ⬅ Only in File 1
 with st.expander(f"⬅ Only in File 1 CSV  —  {len(only_f1_out):,} rows", expanded=False):
     if st.button("📄 Prepare Only-in-File1 CSV", disabled=st.session_state["csv_ready_only_f1"], key="btn_prep_only1"):
-        with st.spinner("Building Only-in-File1 CSV…"):
-            st.session_state["csv_bytes_only_f1"] = _df_to_csv_bytes(run_sig + "|CSV_ONLY_F1", only_f1_out)
-            st.session_state["csv_ready_only_f1"] = True
+        _ep = st.progress(0, text="Building Only-in-File1 CSV…")
+        _ep.progress(30, text="Serialising rows…")
+        st.session_state["csv_bytes_only_f1"] = _df_to_csv_bytes(run_sig + "|CSV_ONLY_F1", only_f1_out)
+        _ep.progress(100, text="✅ Done")
+        st.session_state["csv_ready_only_f1"] = True
     if st.session_state["csv_ready_only_f1"] and st.session_state["csv_bytes_only_f1"] is not None:
         st.download_button(
             "⬇ Download Only-in-File1 (CSV)",
@@ -2235,9 +2273,11 @@ with st.expander(f"⬅ Only in File 1 CSV  —  {len(only_f1_out):,} rows", expa
 # ── ➡ Only in File 2
 with st.expander(f"➡ Only in File 2 CSV  —  {len(only_f2_out):,} rows", expanded=False):
     if st.button("📄 Prepare Only-in-File2 CSV", disabled=st.session_state["csv_ready_only_f2"], key="btn_prep_only2"):
-        with st.spinner("Building Only-in-File2 CSV…"):
-            st.session_state["csv_bytes_only_f2"] = _df_to_csv_bytes(run_sig + "|CSV_ONLY_F2", only_f2_out)
-            st.session_state["csv_ready_only_f2"] = True
+        _ep = st.progress(0, text="Building Only-in-File2 CSV…")
+        _ep.progress(30, text="Serialising rows…")
+        st.session_state["csv_bytes_only_f2"] = _df_to_csv_bytes(run_sig + "|CSV_ONLY_F2", only_f2_out)
+        _ep.progress(100, text="✅ Done")
+        st.session_state["csv_ready_only_f2"] = True
     if st.session_state["csv_ready_only_f2"] and st.session_state["csv_bytes_only_f2"] is not None:
         st.download_button(
             "⬇ Download Only-in-File2 (CSV)",
@@ -2251,25 +2291,31 @@ with st.expander(f"➡ Only in File 2 CSV  —  {len(only_f2_out):,} rows", expa
 with st.expander("📦 One-Click ZIP (All CSVs)", expanded=False):
     st.caption("Creates a single ZIP: Summary + PDF + Matched + Mismatched + Only-in File1 + Only-in File2")
     if st.button("📦 Prepare ZIP (All CSVs)", disabled=st.session_state["csv_ready_zip_all"], key="btn_prep_zip"):
-        with st.spinner("Building ZIP…"):
-            b_matched = _df_to_csv_bytes(run_sig + "|ZIP_MATCHED", matched_out)
-            b_mism    = _df_to_csv_bytes(run_sig + "|ZIP_MISM", mismatched_out)
-            b_only1   = _df_to_csv_bytes(run_sig + "|ZIP_ONLY1", only_f1_out)
-            b_only2   = _df_to_csv_bytes(run_sig + "|ZIP_ONLY2", only_f2_out)
-            b_summary = summary_df.to_csv(index=False).encode("utf-8")
+        _ep = st.progress(0, text="Building ZIP…")
+        _ep.progress(10, text="Preparing Matched…")
+        b_matched = _df_to_csv_bytes(run_sig + "|ZIP_MATCHED", matched_out)
+        _ep.progress(30, text="Preparing Mismatched…")
+        b_mism    = _df_to_csv_bytes(run_sig + "|ZIP_MISM", mismatched_out)
+        _ep.progress(50, text="Preparing Only-in-File1…")
+        b_only1   = _df_to_csv_bytes(run_sig + "|ZIP_ONLY1", only_f1_out)
+        _ep.progress(70, text="Preparing Only-in-File2…")
+        b_only2   = _df_to_csv_bytes(run_sig + "|ZIP_ONLY2", only_f2_out)
+        _ep.progress(85, text="Compressing into ZIP…")
+        b_summary = summary_df.to_csv(index=False).encode("utf-8")
 
-            zbio = io.BytesIO()
-            with zipfile.ZipFile(zbio, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-                zf.writestr("reco_summary.csv", b_summary)
-                if summary_pdf_bytes:
-                    zf.writestr("summary_report.pdf", summary_pdf_bytes)
-                zf.writestr("reco_matched.csv", b_matched)
-                zf.writestr("reco_mismatched.csv", b_mism)
-                zf.writestr("reco_only_in_file1.csv", b_only1)
-                zf.writestr("reco_only_in_file2.csv", b_only2)
+        zbio = io.BytesIO()
+        with zipfile.ZipFile(zbio, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("reco_summary.csv", b_summary)
+            if summary_pdf_bytes:
+                zf.writestr("summary_report.pdf", summary_pdf_bytes)
+            zf.writestr("reco_matched.csv", b_matched)
+            zf.writestr("reco_mismatched.csv", b_mism)
+            zf.writestr("reco_only_in_file1.csv", b_only1)
+            zf.writestr("reco_only_in_file2.csv", b_only2)
 
-            st.session_state["csv_bytes_zip_all"] = zbio.getvalue()
-            st.session_state["csv_ready_zip_all"] = True
+        _ep.progress(100, text="✅ ZIP ready")
+        st.session_state["csv_bytes_zip_all"] = zbio.getvalue()
+        st.session_state["csv_ready_zip_all"] = True
 
     if st.session_state["csv_ready_zip_all"] and st.session_state["csv_bytes_zip_all"] is not None:
         st.download_button(
@@ -2319,8 +2365,9 @@ with st.expander("✅ Main Excel — Summary + Mismatched + Only-in + Duplicates
         key="btn_prep_excel_main"
     )
     if prepare_main:
-        with st.spinner("Building MAIN Excel…"):
-            output_main = _build_excel_cached(run_sig + "|MAIN_NO_MATCHED", {
+        _ep = st.progress(0, text="Building Main Excel…")
+        _ep.progress(20, text="Writing sheets…")
+        output_main = _build_excel_cached(run_sig + "|MAIN_NO_MATCHED", {
                 "Summary": summary_df,
                 "Key_Diagnostics": key_diag_df,
                 "UploadedFiles_File1": f1_summary,
@@ -2334,6 +2381,7 @@ with st.expander("✅ Main Excel — Summary + Mismatched + Only-in + Duplicates
                 "Duplicate_Keys_File2": dup_rows_2_out,
                 "Duplicate_Keys_BothFiles": dup_both_out,
             })
+        _ep.progress(100, text="✅ Excel ready")
         st.session_state["excel_bytes_main"] = output_main
         st.session_state["excel_sig_main"] = run_sig
         st.session_state["excel_ready_main"] = True
@@ -2356,10 +2404,12 @@ with st.expander(f"📌 Matched Excel only  —  {len(matched_out):,} rows  (opt
         key="btn_prep_excel_matched"
     )
     if prepare_matched:
-        with st.spinner("Building MATCHED Excel… (may take time for large matched rows)"):
-            output_matched = _build_excel_cached(run_sig + "|MATCHED_ONLY", {
-                "Matched": matched_out
-            })
+        _ep = st.progress(0, text="Building Matched Excel… (may be slow for large files)")
+        _ep.progress(20, text="Writing Matched sheet…")
+        output_matched = _build_excel_cached(run_sig + "|MATCHED_ONLY", {
+            "Matched": matched_out
+        })
+        _ep.progress(100, text="✅ Excel ready")
         st.session_state["excel_bytes_matched"] = output_matched
         st.session_state["excel_sig_matched"] = run_sig
         st.session_state["excel_ready_matched"] = True

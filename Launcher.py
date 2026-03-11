@@ -327,7 +327,7 @@ with hero_mid:
             <span class="heroVer">Launcher {LAUNCHER_VERSION}</span>
           </div>
           <div class="heroSub">
-            Select tool → Launch (no auto-run / no loops). Use “Open in new tab” if you want both tools at once.
+            Select tool → Launch (no auto-run / no loops). Use "Open in new tab" if you want both tools at once.
           </div>
         </div>
       </div>
@@ -460,7 +460,7 @@ with right_home:
             Data stays on your machine.<br>
             No external upload.<br><br>
             <b>Support:</b><br>
-            aarohi.sharma@paytm.com
+            aarohisharma5000@gmail.com
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -572,16 +572,12 @@ else:
     tool_key = st.session_state["selected_tool"]
     try:
         if tool_key == "tool1":
-            import importlib
-            import app as _app
-            importlib.reload(_app)
+            # ✅ exec() avoids duplicate widget key error caused by importlib.reload()
+            #    importlib.reload() re-registers widgets in the same render cycle → crash
+            exec(open(str(BASE / "app.py")).read(), {"__name__": "__main__"})
         elif tool_key == "tool2":
-            import importlib
-            import app_v2 as _app2
-            importlib.reload(_app2)
+            exec(open(str(BASE / "app_v2.py")).read(), {"__name__": "__main__"})
+    except SystemExit:
+        pass  # st.stop() raises SystemExit — this is normal, ignore it
     except Exception as e:
         st.error(f"Error loading tool: {e}")
-
-
-
-

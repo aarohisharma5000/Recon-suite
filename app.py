@@ -1630,10 +1630,17 @@ skip_recompute = has_cached_run  # ✅ the missing piece in your file earlier
 prog = st.progress(0)
 label = st.empty()
 
+# ✅ Run log — captures each step message for the Run Log tab
+if "run_log_lines" not in st.session_state:
+    st.session_state["run_log_lines"] = []
+
 def progress_update(step, total_steps, msg):
+    from datetime import datetime as _dt
     pct = int((step / total_steps) * 100)
     prog.progress(min(100, pct))
     label.info(f"Step {step}/{total_steps}: {msg}")
+    ts = _dt.now().strftime("%H:%M:%S")
+    st.session_state["run_log_lines"].append(f"[{ts}] Step {step}/{total_steps}: {msg}")
 
 TOTAL_STEPS = 7
 
@@ -2029,7 +2036,7 @@ if not skip_recompute:
     st.subheader("5) Outputs")
     tabs = st.tabs([
         "✅ Matched", "❌ Mismatched", "⬅ Only in File 1", "➡ Only in File 2",
-        "🟡 Duplicate_Keys_File1", "🟡 Duplicate_Keys_File2", "🟠 Duplicate_Keys_BothFiles"
+        "🟡 Dup_File1", "🟡 Dup_File2", "🟠 Dup_Both", "🧾 Run Log"
     ])
 
     with tabs[0]:
@@ -2046,6 +2053,10 @@ if not skip_recompute:
         st.dataframe(dup_rows_2_out.head(int(show_rows_in_browser)), use_container_width=True)
     with tabs[6]:
         st.dataframe(dup_both_out.head(int(show_rows_in_browser)), use_container_width=True)
+    with tabs[7]:
+        # ✅ Run Log tab — shows step-by-step execution log
+        _log = st.session_state.get("run_log_lines", [])
+        st.code("\n".join(_log) if _log else "No log available yet.", language="text")
 
     # -----------------------------
     # ✅ Save Run outputs to session cache (prevents rerun recompute on downloads)
@@ -2084,7 +2095,7 @@ if has_cached_run:
     st.subheader("5) Outputs")
     tabs = st.tabs([
         "✅ Matched", "❌ Mismatched", "⬅ Only in File 1", "➡ Only in File 2",
-        "🟡 Duplicate_Keys_File1", "🟡 Duplicate_Keys_File2", "🟠 Duplicate_Keys_BothFiles"
+        "🟡 Dup_File1", "🟡 Dup_File2", "🟠 Dup_Both", "🧾 Run Log"
     ])
     with tabs[0]:
         st.dataframe(matched_out.head(int(show_rows_in_browser)), use_container_width=True)
@@ -2100,6 +2111,9 @@ if has_cached_run:
         st.dataframe(dup_rows_2_out.head(int(show_rows_in_browser)), use_container_width=True)
     with tabs[6]:
         st.dataframe(dup_both_out.head(int(show_rows_in_browser)), use_container_width=True)
+    with tabs[7]:
+        _log = st.session_state.get("run_log_lines", [])
+        st.code("\n".join(_log) if _log else "No log available (cached run).", language="text")
 
 out_summary_pdf = Path("summary_report_tool1.pdf")
 # -----------------------------
@@ -2136,20 +2150,10 @@ run_sig = (
 )
 
 # ==================================================
-# (A) ⚡ SUPER FAST CSV DOWNLOADS
+# (A) ⚡ CSV DOWNLOADS — Grouped Expanders
 # ==================================================
-st.markdown("### ⚡ Super Fast CSV Downloads (Huge Rows)")
+st.markdown("### ⚡ CSV Downloads")
 st.caption("CSV is fastest for very large outputs. No formatting, only raw data.")
-
-# ✅ Summary CSV (always available immediately)
-st.markdown("**📋 Summary (CSV)**")
-summary_csv_bytes = summary_df.to_csv(index=False).encode("utf-8")
-st.download_button(
-    "⬇ Download Summary (CSV)",
-    data=summary_csv_bytes,
-    file_name="reco_summary.csv",
-    mime="text/csv"
-)
 
 # Init CSV session keys
 for k in [
@@ -2171,11 +2175,21 @@ if st.session_state.get("csv_sig_last") != run_sig:
     st.session_state["csv_ready_only_f2"] = False
     st.session_state["csv_ready_zip_all"] = False
 
-c_csv1, c_csv2 = st.columns(2)
+# ── 📋 Summary (always instant, no prepare needed)
+with st.expander("📋 Summary CSV", expanded=True):
+    st.caption(f"{len(summary_df):,} rows — available immediately")
+    summary_csv_bytes = summary_df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "⬇ Download Summary (CSV)",
+        data=summary_csv_bytes,
+        file_name="reco_summary.csv",
+        mime="text/csv",
+        key="dl_summary_csv"
+    )
 
-with c_csv1:
-    st.markdown("**✅ Matched (CSV)**")
-    if st.button("📄 Prepare Matched CSV", disabled=st.session_state["csv_ready_matched"]):
+# ── ✅ Matched
+with st.expander(f"✅ Matched CSV  —  {len(matched_out):,} rows", expanded=False):
+    if st.button("📄 Prepare Matched CSV", disabled=st.session_state["csv_ready_matched"], key="btn_prep_matched"):
         with st.spinner("Building Matched CSV…"):
             st.session_state["csv_bytes_matched"] = _df_to_csv_bytes(run_sig + "|CSV_MATCHED", matched_out)
             st.session_state["csv_ready_matched"] = True
@@ -2184,12 +2198,13 @@ with c_csv1:
             "⬇ Download Matched (CSV)",
             data=st.session_state["csv_bytes_matched"],
             file_name="reco_matched.csv",
-            mime="text/csv"
+            mime="text/csv",
+            key="dl_matched_csv"
         )
 
-with c_csv2:
-    st.markdown("**❌ Mismatched (CSV)**")
-    if st.button("📄 Prepare Mismatched CSV", disabled=st.session_state["csv_ready_mismatched"]):
+# ── ❌ Mismatched
+with st.expander(f"❌ Mismatched CSV  —  {len(mismatched_out):,} rows", expanded=True):
+    if st.button("📄 Prepare Mismatched CSV", disabled=st.session_state["csv_ready_mismatched"], key="btn_prep_mism"):
         with st.spinner("Building Mismatched CSV…"):
             st.session_state["csv_bytes_mismatched"] = _df_to_csv_bytes(run_sig + "|CSV_MISMATCHED", mismatched_out)
             st.session_state["csv_ready_mismatched"] = True
@@ -2198,14 +2213,13 @@ with c_csv2:
             "⬇ Download Mismatched (CSV)",
             data=st.session_state["csv_bytes_mismatched"],
             file_name="reco_mismatched.csv",
-            mime="text/csv"
+            mime="text/csv",
+            key="dl_mism_csv"
         )
 
-c_csv3, c_csv4 = st.columns(2)
-
-with c_csv3:
-    st.markdown("**⬅ Only in File 1 (CSV)**")
-    if st.button("📄 Prepare Only-in-File1 CSV", disabled=st.session_state["csv_ready_only_f1"]):
+# ── ⬅ Only in File 1
+with st.expander(f"⬅ Only in File 1 CSV  —  {len(only_f1_out):,} rows", expanded=False):
+    if st.button("📄 Prepare Only-in-File1 CSV", disabled=st.session_state["csv_ready_only_f1"], key="btn_prep_only1"):
         with st.spinner("Building Only-in-File1 CSV…"):
             st.session_state["csv_bytes_only_f1"] = _df_to_csv_bytes(run_sig + "|CSV_ONLY_F1", only_f1_out)
             st.session_state["csv_ready_only_f1"] = True
@@ -2214,12 +2228,13 @@ with c_csv3:
             "⬇ Download Only-in-File1 (CSV)",
             data=st.session_state["csv_bytes_only_f1"],
             file_name="reco_only_in_file1.csv",
-            mime="text/csv"
+            mime="text/csv",
+            key="dl_only1_csv"
         )
 
-with c_csv4:
-    st.markdown("**➡ Only in File 2 (CSV)**")
-    if st.button("📄 Prepare Only-in-File2 CSV", disabled=st.session_state["csv_ready_only_f2"]):
+# ── ➡ Only in File 2
+with st.expander(f"➡ Only in File 2 CSV  —  {len(only_f2_out):,} rows", expanded=False):
+    if st.button("📄 Prepare Only-in-File2 CSV", disabled=st.session_state["csv_ready_only_f2"], key="btn_prep_only2"):
         with st.spinner("Building Only-in-File2 CSV…"):
             st.session_state["csv_bytes_only_f2"] = _df_to_csv_bytes(run_sig + "|CSV_ONLY_F2", only_f2_out)
             st.session_state["csv_ready_only_f2"] = True
@@ -2228,149 +2243,135 @@ with c_csv4:
             "⬇ Download Only-in-File2 (CSV)",
             data=st.session_state["csv_bytes_only_f2"],
             file_name="reco_only_in_file2.csv",
-            mime="text/csv"
+            mime="text/csv",
+            key="dl_only2_csv"
         )
 
-st.markdown("### 📦 One-Click ZIP (All CSVs)")
-st.caption("Creates a single ZIP containing Matched, Mismatched, Only-in File1, Only-in File2 (CSV).")
+# ── 📦 ZIP — One click, all CSVs
+with st.expander("📦 One-Click ZIP (All CSVs)", expanded=False):
+    st.caption("Creates a single ZIP: Summary + PDF + Matched + Mismatched + Only-in File1 + Only-in File2")
+    if st.button("📦 Prepare ZIP (All CSVs)", disabled=st.session_state["csv_ready_zip_all"], key="btn_prep_zip"):
+        with st.spinner("Building ZIP…"):
+            b_matched = _df_to_csv_bytes(run_sig + "|ZIP_MATCHED", matched_out)
+            b_mism    = _df_to_csv_bytes(run_sig + "|ZIP_MISM", mismatched_out)
+            b_only1   = _df_to_csv_bytes(run_sig + "|ZIP_ONLY1", only_f1_out)
+            b_only2   = _df_to_csv_bytes(run_sig + "|ZIP_ONLY2", only_f2_out)
+            b_summary = summary_df.to_csv(index=False).encode("utf-8")
 
-if st.button("📦 Prepare ZIP (All CSVs)", disabled=st.session_state["csv_ready_zip_all"]):
-    with st.spinner("Building ZIP…"):
-        b_matched = _df_to_csv_bytes(run_sig + "|ZIP_MATCHED", matched_out)
-        b_mism    = _df_to_csv_bytes(run_sig + "|ZIP_MISM", mismatched_out)
-        b_only1   = _df_to_csv_bytes(run_sig + "|ZIP_ONLY1", only_f1_out)
-        b_only2   = _df_to_csv_bytes(run_sig + "|ZIP_ONLY2", only_f2_out)
+            zbio = io.BytesIO()
+            with zipfile.ZipFile(zbio, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("reco_summary.csv", b_summary)
+                if summary_pdf_bytes:
+                    zf.writestr("summary_report.pdf", summary_pdf_bytes)
+                zf.writestr("reco_matched.csv", b_matched)
+                zf.writestr("reco_mismatched.csv", b_mism)
+                zf.writestr("reco_only_in_file1.csv", b_only1)
+                zf.writestr("reco_only_in_file2.csv", b_only2)
 
-        b_summary = summary_df.to_csv(index=False).encode("utf-8")
+            st.session_state["csv_bytes_zip_all"] = zbio.getvalue()
+            st.session_state["csv_ready_zip_all"] = True
 
-        zbio = io.BytesIO()
-        with zipfile.ZipFile(zbio, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr("reco_summary.csv", b_summary)          # ✅ Summary CSV added
-            if summary_pdf_bytes:
-                zf.writestr("summary_report.pdf", summary_pdf_bytes)
-            zf.writestr("reco_matched.csv", b_matched)
-            zf.writestr("reco_mismatched.csv", b_mism)
-            zf.writestr("reco_only_in_file1.csv", b_only1)
-            zf.writestr("reco_only_in_file2.csv", b_only2)
-
-        st.session_state["csv_bytes_zip_all"] = zbio.getvalue()
-        st.session_state["csv_ready_zip_all"] = True
-
-if st.session_state["csv_ready_zip_all"] and st.session_state["csv_bytes_zip_all"] is not None:
-    st.download_button(
-        "⬇ Download ZIP (All CSVs)",
-        data=st.session_state["csv_bytes_zip_all"],
-        file_name="reco_output_all_csv.zip",
-        mime="application/zip"
-    )
+    if st.session_state["csv_ready_zip_all"] and st.session_state["csv_bytes_zip_all"] is not None:
+        st.download_button(
+            "⬇ Download ZIP (All CSVs)",
+            data=st.session_state["csv_bytes_zip_all"],
+            file_name="reco_output_all_csv.zip",
+            mime="application/zip",
+            key="dl_zip_all"
+        )
 
 st.divider()
 
 # ==================================================
-# (B) 📊 EXCEL DOWNLOADS (WITH YOUR FORMATTING + FORMULAS)
+# (B) 📊 EXCEL DOWNLOADS — Grouped Expanders
 # ==================================================
+st.markdown("### 📊 Excel Downloads")
+st.caption("Formatted Excel with subtotals + formulas. Slightly slower than CSV.")
 
-# Init Excel session keys (same as your earlier version)
-if "excel_bytes_main" not in st.session_state:
-    st.session_state["excel_bytes_main"] = None
-if "excel_sig_main" not in st.session_state:
-    st.session_state["excel_sig_main"] = None
-if "excel_ready_main" not in st.session_state:
-    st.session_state["excel_ready_main"] = False
-
-if "excel_bytes_matched" not in st.session_state:
-    st.session_state["excel_bytes_matched"] = None
-if "excel_sig_matched" not in st.session_state:
-    st.session_state["excel_sig_matched"] = None
-if "excel_ready_matched" not in st.session_state:
-    st.session_state["excel_ready_matched"] = False
+# Init Excel session keys
+for _k, _v in [
+    ("excel_bytes_main", None), ("excel_sig_main", None), ("excel_ready_main", False),
+    ("excel_bytes_matched", None), ("excel_sig_matched", None), ("excel_ready_matched", False),
+]:
+    if _k not in st.session_state:
+        st.session_state[_k] = _v
 
 @st.cache_data(show_spinner=False)
 def _build_excel_cached(_sig: str, sheets: dict) -> bytes:
     return build_excel_bytes(sheets)
-
-# -----------------------------
-# B1) MAIN Excel: everything EXCEPT Matched (FAST)  ✅ keeps formatting
-# -----------------------------
-st.markdown("### ✅ Excel (Recommended) — Without Matched")
-st.caption("Includes Summary + diagnostics + mismatches + only-in + duplicates. Matched excluded for speed.")
 
 if st.session_state["excel_bytes_main"] is not None and st.session_state["excel_sig_main"] == run_sig:
     st.session_state["excel_ready_main"] = True
 else:
     st.session_state["excel_ready_main"] = False
 
-prepare_main = st.button(
-    "📦 Prepare Main Excel (without Matched)",
-    disabled=st.session_state["excel_ready_main"]
-)
-
-if prepare_main:
-    with st.spinner("Building MAIN Excel (excluding Matched)…"):
-        output_main = _build_excel_cached(run_sig + "|MAIN_NO_MATCHED", {
-            "Summary": summary_df,
-            "Key_Diagnostics": key_diag_df,
-            "UploadedFiles_File1": f1_summary,
-            "UploadedFiles_File2": f2_summary,
-            "MissingCols_File1": miss_cols_f1,
-            "MissingCols_File2": miss_cols_f2,
-            "Mismatched": mismatched_out,     # ✅ formatted + subtotal + formulas
-            "Only_in_File1": only_f1_out,
-            "Only_in_File2": only_f2_out,
-            "Duplicate_Keys_File1": dup_rows_1_out,
-            "Duplicate_Keys_File2": dup_rows_2_out,
-            "Duplicate_Keys_BothFiles": dup_both_out,
-        })
-
-    st.session_state["excel_bytes_main"] = output_main
-    st.session_state["excel_sig_main"] = run_sig
-    st.session_state["excel_ready_main"] = True
-    st.success("✅ Main Excel is ready.")
-
-if st.session_state["excel_ready_main"] and st.session_state["excel_bytes_main"] is not None:
-    st.download_button(
-        "⬇ Download Main Reco Output (Excel)",
-        data=st.session_state["excel_bytes_main"],
-        file_name="reco_output_MAIN_no_matched.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-st.divider()
-
-# -----------------------------
-# B2) OPTIONAL Excel: Matched ONLY (SLOWER) ✅ keeps formatting
-# -----------------------------
-st.markdown("### 📌 Optional Excel — Matched Only")
-st.caption("Matched can be very large. Generate only if required.")
-
 if st.session_state["excel_bytes_matched"] is not None and st.session_state["excel_sig_matched"] == run_sig:
     st.session_state["excel_ready_matched"] = True
 else:
     st.session_state["excel_ready_matched"] = False
 
-prepare_matched = st.button(
-    "📦 Prepare Matched Excel (Only Matched Sheet)",
-    disabled=st.session_state["excel_ready_matched"]
-)
-
-if prepare_matched:
-    with st.spinner("Building MATCHED Excel… (may take time for large matched rows)"):
-        output_matched = _build_excel_cached(run_sig + "|MATCHED_ONLY", {
-            "Matched": matched_out  # ✅ formatted + subtotal + formulas
-        })
-
-    st.session_state["excel_bytes_matched"] = output_matched
-    st.session_state["excel_sig_matched"] = run_sig
-    st.session_state["excel_ready_matched"] = True
-    st.success("✅ Matched Excel is ready.")
-
-if st.session_state["excel_ready_matched"] and st.session_state["excel_bytes_matched"] is not None:
-    st.download_button(
-        "⬇ Download Matched (Excel)",
-        data=st.session_state["excel_bytes_matched"],
-        file_name="reco_output_MATCHED_only.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+# ── Main Excel (without Matched)
+with st.expander("✅ Main Excel — Summary + Mismatched + Only-in + Duplicates  (Recommended)", expanded=True):
+    st.caption("Excludes Matched sheet for speed. Includes all other sheets with formatting.")
+    prepare_main = st.button(
+        "📦 Prepare Main Excel (without Matched)",
+        disabled=st.session_state["excel_ready_main"],
+        key="btn_prep_excel_main"
     )
+    if prepare_main:
+        with st.spinner("Building MAIN Excel…"):
+            output_main = _build_excel_cached(run_sig + "|MAIN_NO_MATCHED", {
+                "Summary": summary_df,
+                "Key_Diagnostics": key_diag_df,
+                "UploadedFiles_File1": f1_summary,
+                "UploadedFiles_File2": f2_summary,
+                "MissingCols_File1": miss_cols_f1,
+                "MissingCols_File2": miss_cols_f2,
+                "Mismatched": mismatched_out,
+                "Only_in_File1": only_f1_out,
+                "Only_in_File2": only_f2_out,
+                "Duplicate_Keys_File1": dup_rows_1_out,
+                "Duplicate_Keys_File2": dup_rows_2_out,
+                "Duplicate_Keys_BothFiles": dup_both_out,
+            })
+        st.session_state["excel_bytes_main"] = output_main
+        st.session_state["excel_sig_main"] = run_sig
+        st.session_state["excel_ready_main"] = True
+        st.success("✅ Main Excel is ready.")
+    if st.session_state["excel_ready_main"] and st.session_state["excel_bytes_main"] is not None:
+        st.download_button(
+            "⬇ Download Main Reco Output (Excel)",
+            data=st.session_state["excel_bytes_main"],
+            file_name="reco_output_MAIN_no_matched.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="dl_excel_main"
+        )
+
+# ── Matched Excel (optional, slower)
+with st.expander(f"📌 Matched Excel only  —  {len(matched_out):,} rows  (optional, can be slow)", expanded=False):
+    st.caption("Generate only if you need Matched rows in formatted Excel.")
+    prepare_matched = st.button(
+        "📦 Prepare Matched Excel",
+        disabled=st.session_state["excel_ready_matched"],
+        key="btn_prep_excel_matched"
+    )
+    if prepare_matched:
+        with st.spinner("Building MATCHED Excel… (may take time for large matched rows)"):
+            output_matched = _build_excel_cached(run_sig + "|MATCHED_ONLY", {
+                "Matched": matched_out
+            })
+        st.session_state["excel_bytes_matched"] = output_matched
+        st.session_state["excel_sig_matched"] = run_sig
+        st.session_state["excel_ready_matched"] = True
+        st.success("✅ Matched Excel is ready.")
+    if st.session_state["excel_ready_matched"] and st.session_state["excel_bytes_matched"] is not None:
+        st.download_button(
+            "⬇ Download Matched (Excel)",
+            data=st.session_state["excel_bytes_matched"],
+            file_name="reco_output_MATCHED_only.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="dl_excel_matched"
+        )
 
 
 

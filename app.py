@@ -1075,21 +1075,21 @@ left, right = st.columns(2)
 with left:
     st.write("File 1 uploads")
     st.caption(f"Total files: {len(f1_list)} | Total rows: {len(df1):,}")
-    st.dataframe(f1_summary, use_container_width=True)
+    st.dataframe(f1_summary, use_container_width=True, hide_index=True)
 
 with right:
     st.write("File 2 uploads")
     st.caption(f"Total files: {len(f2_list)} | Total rows: {len(df2):,}")
-    st.dataframe(f2_summary, use_container_width=True)
+    st.dataframe(f2_summary, use_container_width=True, hide_index=True)
 
 st.markdown("### 🔍 Missing Matched Columns (file-wise)")
 cA, cB = st.columns(2)
 with cA:
     st.write("File 1 side: files missing any of the matched columns")
-    st.dataframe(miss_cols_f1, use_container_width=True)
+    st.dataframe(miss_cols_f1, use_container_width=True, hide_index=True)
 with cB:
     st.write("File 2 side: files missing any of the matched columns")
-    st.dataframe(miss_cols_f2, use_container_width=True)
+    st.dataframe(miss_cols_f2, use_container_width=True, hide_index=True)
 
 # -----------------------------
 # Preview (combined)
@@ -1098,10 +1098,10 @@ st.subheader("1) Preview (combined)")
 p1, p2 = st.columns(2)
 with p1:
     st.write("File 1 Combined Preview")
-    st.dataframe(df1.head(20), use_container_width=True)
+    st.dataframe(df1.head(20), use_container_width=True, hide_index=True)
 with p2:
     st.write("File 2 Combined Preview")
-    st.dataframe(df2.head(20), use_container_width=True)
+    st.dataframe(df2.head(20), use_container_width=True, hide_index=True)
 
 if not common_cols:
     st.error("No common columns found between the two sides. Please ensure headers match.")
@@ -1236,10 +1236,10 @@ with st.expander("Show Raw vs Clean Key Preview (Top 20)", expanded=False):
     c_prev1, c_prev2 = st.columns(2)
     with c_prev1:
         st.write("**File 1 — Top 20**")
-        st.dataframe(prev1_nz, use_container_width=True)
+        st.dataframe(prev1_nz, use_container_width=True, hide_index=True)
     with c_prev2:
         st.write("**File 2 — Top 20**")
-        st.dataframe(prev2_nz, use_container_width=True)
+        st.dataframe(prev2_nz, use_container_width=True, hide_index=True)
 
     # quick overlap signal
     set1 = set(prev1_nz["Clean_Key"].tolist())
@@ -1567,12 +1567,12 @@ sf_left, sf_right = st.columns(2)
 with sf_left:
     st.caption(f"File 1 side: {reco_focus_col} file-wise sum (valid keys only)")
     f1_focus_summary = build_selected_field_summary_before_run(df1, reco_focus_col)
-    st.dataframe(f1_focus_summary, use_container_width=True)
+    st.dataframe(f1_focus_summary, use_container_width=True, hide_index=True)
 
 with sf_right:
     st.caption(f"File 2 side: {reco_focus_col} file-wise sum (valid keys only)")
     f2_focus_summary = build_selected_field_summary_before_run(df2, reco_focus_col)
-    st.dataframe(f2_focus_summary, use_container_width=True)
+    st.dataframe(f2_focus_summary, use_container_width=True, hide_index=True)
 
 # -----------------------------
 # Run
@@ -2031,7 +2031,7 @@ if not skip_recompute:
     k6.metric("Duplicate Keys (union)", f"{len(dup_union):,}")
 
     st.subheader("4) Summary")
-    st.dataframe(summary_df, use_container_width=True)
+    st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
     st.subheader("5) Outputs")
     tabs = st.tabs([
@@ -2040,19 +2040,19 @@ if not skip_recompute:
     ])
 
     with tabs[0]:
-        st.dataframe(matched_out.head(int(show_rows_in_browser)), use_container_width=True)
+        st.dataframe(matched_out.head(int(show_rows_in_browser)), use_container_width=True, hide_index=True)
     with tabs[1]:
-        st.dataframe(mismatched_out.head(int(show_rows_in_browser)), use_container_width=True)
+        st.dataframe(mismatched_out.head(int(show_rows_in_browser)), use_container_width=True, hide_index=True)
     with tabs[2]:
-        st.dataframe(only_f1_out.head(int(show_rows_in_browser)), use_container_width=True)
+        st.dataframe(only_f1_out.head(int(show_rows_in_browser)), use_container_width=True, hide_index=True)
     with tabs[3]:
-        st.dataframe(only_f2_out.head(int(show_rows_in_browser)), use_container_width=True)
+        st.dataframe(only_f2_out.head(int(show_rows_in_browser)), use_container_width=True, hide_index=True)
     with tabs[4]:
-        st.dataframe(dup_rows_1_out.head(int(show_rows_in_browser)), use_container_width=True)
+        st.dataframe(dup_rows_1_out.head(int(show_rows_in_browser)), use_container_width=True, hide_index=True)
     with tabs[5]:
-        st.dataframe(dup_rows_2_out.head(int(show_rows_in_browser)), use_container_width=True)
+        st.dataframe(dup_rows_2_out.head(int(show_rows_in_browser)), use_container_width=True, hide_index=True)
     with tabs[6]:
-        st.dataframe(dup_both_out.head(int(show_rows_in_browser)), use_container_width=True)
+        st.dataframe(dup_both_out.head(int(show_rows_in_browser)), use_container_width=True, hide_index=True)
     with tabs[7]:
         # ✅ Run Log tab — shows step-by-step execution log
         _log = st.session_state.get("run_log_lines", [])
@@ -2090,7 +2090,7 @@ if has_cached_run:
     k6.metric("Duplicate Keys (union)", f"{len(pd.Index(dup_rows_1_out.get('_KEY', pd.Series([]))).unique()):,}")
 
     st.subheader("4) Summary")
-    st.dataframe(summary_df, use_container_width=True)
+    st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
     st.subheader("5) Outputs")
     tabs = st.tabs([
@@ -2098,19 +2098,19 @@ if has_cached_run:
         "🟡 Dup_File1", "🟡 Dup_File2", "🟠 Dup_Both", "🧾 Run Log"
     ])
     with tabs[0]:
-        st.dataframe(matched_out.head(int(show_rows_in_browser)), use_container_width=True)
+        st.dataframe(matched_out.head(int(show_rows_in_browser)), use_container_width=True, hide_index=True)
     with tabs[1]:
-        st.dataframe(mismatched_out.head(int(show_rows_in_browser)), use_container_width=True)
+        st.dataframe(mismatched_out.head(int(show_rows_in_browser)), use_container_width=True, hide_index=True)
     with tabs[2]:
-        st.dataframe(only_f1_out.head(int(show_rows_in_browser)), use_container_width=True)
+        st.dataframe(only_f1_out.head(int(show_rows_in_browser)), use_container_width=True, hide_index=True)
     with tabs[3]:
-        st.dataframe(only_f2_out.head(int(show_rows_in_browser)), use_container_width=True)
+        st.dataframe(only_f2_out.head(int(show_rows_in_browser)), use_container_width=True, hide_index=True)
     with tabs[4]:
-        st.dataframe(dup_rows_1_out.head(int(show_rows_in_browser)), use_container_width=True)
+        st.dataframe(dup_rows_1_out.head(int(show_rows_in_browser)), use_container_width=True, hide_index=True)
     with tabs[5]:
-        st.dataframe(dup_rows_2_out.head(int(show_rows_in_browser)), use_container_width=True)
+        st.dataframe(dup_rows_2_out.head(int(show_rows_in_browser)), use_container_width=True, hide_index=True)
     with tabs[6]:
-        st.dataframe(dup_both_out.head(int(show_rows_in_browser)), use_container_width=True)
+        st.dataframe(dup_both_out.head(int(show_rows_in_browser)), use_container_width=True, hide_index=True)
     with tabs[7]:
         _log = st.session_state.get("run_log_lines", [])
         st.code("\n".join(_log) if _log else "No log available (cached run).", language="text")
@@ -2124,38 +2124,6 @@ prog.progress(100)
 label.success("✅ Completed")
 
 st.subheader("6) Download")
-
-# ── 📦 Total Download Size Badge — covers ALL prepared files (CSV + Excel)
-#    Updates live as user prepares each file
-_total_bytes = 0
-for _key in [
-    "csv_bytes_matched", "csv_bytes_mismatched",
-    "csv_bytes_only_f1", "csv_bytes_only_f2",
-    "csv_bytes_zip_all",
-    "excel_bytes_main", "excel_bytes_matched",
-]:
-    _b = st.session_state.get(_key)
-    if _b is not None:
-        _total_bytes += len(_b)
-# Summary CSV is always generated inline — add its size too
-_total_bytes += len(summary_df.to_csv(index=False).encode("utf-8"))
-
-_total_mb = _total_bytes / (1024 * 1024)
-_badge_color = "#198754" if _total_mb < 50 else ("#fd7e14" if _total_mb < 200 else "#dc3545")
-st.markdown(
-    f"""<div style="
-        display:inline-block;
-        background:{_badge_color};
-        color:white;
-        padding:6px 14px;
-        border-radius:10px;
-        font-size:13px;
-        font-weight:700;
-        margin-bottom:4px;
-    ">📦 Total prepared download size: {_total_mb:,.2f} MB</div>""",
-    unsafe_allow_html=True
-)
-st.caption("Size updates as you prepare each file below.")
 
 summary_pdf_bytes = out_summary_pdf.read_bytes() if out_summary_pdf.exists() else b""
 
@@ -2222,11 +2190,9 @@ with st.expander("📋 Summary CSV", expanded=True):
 # ── ✅ Matched
 with st.expander(f"✅ Matched CSV  —  {len(matched_out):,} rows", expanded=False):
     if st.button("📄 Prepare Matched CSV", disabled=st.session_state["csv_ready_matched"], key="btn_prep_matched"):
-        _ep = st.progress(0, text="Building Matched CSV…")
-        _ep.progress(30, text="Serialising rows…")
-        st.session_state["csv_bytes_matched"] = _df_to_csv_bytes(run_sig + "|CSV_MATCHED", matched_out)
-        _ep.progress(100, text="✅ Done")
-        st.session_state["csv_ready_matched"] = True
+        with st.spinner("Building Matched CSV…"):
+            st.session_state["csv_bytes_matched"] = _df_to_csv_bytes(run_sig + "|CSV_MATCHED", matched_out)
+            st.session_state["csv_ready_matched"] = True
     if st.session_state["csv_ready_matched"] and st.session_state["csv_bytes_matched"] is not None:
         st.download_button(
             "⬇ Download Matched (CSV)",
@@ -2239,11 +2205,9 @@ with st.expander(f"✅ Matched CSV  —  {len(matched_out):,} rows", expanded=Fa
 # ── ❌ Mismatched
 with st.expander(f"❌ Mismatched CSV  —  {len(mismatched_out):,} rows", expanded=True):
     if st.button("📄 Prepare Mismatched CSV", disabled=st.session_state["csv_ready_mismatched"], key="btn_prep_mism"):
-        _ep = st.progress(0, text="Building Mismatched CSV…")
-        _ep.progress(30, text="Serialising rows…")
-        st.session_state["csv_bytes_mismatched"] = _df_to_csv_bytes(run_sig + "|CSV_MISMATCHED", mismatched_out)
-        _ep.progress(100, text="✅ Done")
-        st.session_state["csv_ready_mismatched"] = True
+        with st.spinner("Building Mismatched CSV…"):
+            st.session_state["csv_bytes_mismatched"] = _df_to_csv_bytes(run_sig + "|CSV_MISMATCHED", mismatched_out)
+            st.session_state["csv_ready_mismatched"] = True
     if st.session_state["csv_ready_mismatched"] and st.session_state["csv_bytes_mismatched"] is not None:
         st.download_button(
             "⬇ Download Mismatched (CSV)",
@@ -2256,11 +2220,9 @@ with st.expander(f"❌ Mismatched CSV  —  {len(mismatched_out):,} rows", expan
 # ── ⬅ Only in File 1
 with st.expander(f"⬅ Only in File 1 CSV  —  {len(only_f1_out):,} rows", expanded=False):
     if st.button("📄 Prepare Only-in-File1 CSV", disabled=st.session_state["csv_ready_only_f1"], key="btn_prep_only1"):
-        _ep = st.progress(0, text="Building Only-in-File1 CSV…")
-        _ep.progress(30, text="Serialising rows…")
-        st.session_state["csv_bytes_only_f1"] = _df_to_csv_bytes(run_sig + "|CSV_ONLY_F1", only_f1_out)
-        _ep.progress(100, text="✅ Done")
-        st.session_state["csv_ready_only_f1"] = True
+        with st.spinner("Building Only-in-File1 CSV…"):
+            st.session_state["csv_bytes_only_f1"] = _df_to_csv_bytes(run_sig + "|CSV_ONLY_F1", only_f1_out)
+            st.session_state["csv_ready_only_f1"] = True
     if st.session_state["csv_ready_only_f1"] and st.session_state["csv_bytes_only_f1"] is not None:
         st.download_button(
             "⬇ Download Only-in-File1 (CSV)",
@@ -2273,11 +2235,9 @@ with st.expander(f"⬅ Only in File 1 CSV  —  {len(only_f1_out):,} rows", expa
 # ── ➡ Only in File 2
 with st.expander(f"➡ Only in File 2 CSV  —  {len(only_f2_out):,} rows", expanded=False):
     if st.button("📄 Prepare Only-in-File2 CSV", disabled=st.session_state["csv_ready_only_f2"], key="btn_prep_only2"):
-        _ep = st.progress(0, text="Building Only-in-File2 CSV…")
-        _ep.progress(30, text="Serialising rows…")
-        st.session_state["csv_bytes_only_f2"] = _df_to_csv_bytes(run_sig + "|CSV_ONLY_F2", only_f2_out)
-        _ep.progress(100, text="✅ Done")
-        st.session_state["csv_ready_only_f2"] = True
+        with st.spinner("Building Only-in-File2 CSV…"):
+            st.session_state["csv_bytes_only_f2"] = _df_to_csv_bytes(run_sig + "|CSV_ONLY_F2", only_f2_out)
+            st.session_state["csv_ready_only_f2"] = True
     if st.session_state["csv_ready_only_f2"] and st.session_state["csv_bytes_only_f2"] is not None:
         st.download_button(
             "⬇ Download Only-in-File2 (CSV)",
@@ -2291,31 +2251,25 @@ with st.expander(f"➡ Only in File 2 CSV  —  {len(only_f2_out):,} rows", expa
 with st.expander("📦 One-Click ZIP (All CSVs)", expanded=False):
     st.caption("Creates a single ZIP: Summary + PDF + Matched + Mismatched + Only-in File1 + Only-in File2")
     if st.button("📦 Prepare ZIP (All CSVs)", disabled=st.session_state["csv_ready_zip_all"], key="btn_prep_zip"):
-        _ep = st.progress(0, text="Building ZIP…")
-        _ep.progress(10, text="Preparing Matched…")
-        b_matched = _df_to_csv_bytes(run_sig + "|ZIP_MATCHED", matched_out)
-        _ep.progress(30, text="Preparing Mismatched…")
-        b_mism    = _df_to_csv_bytes(run_sig + "|ZIP_MISM", mismatched_out)
-        _ep.progress(50, text="Preparing Only-in-File1…")
-        b_only1   = _df_to_csv_bytes(run_sig + "|ZIP_ONLY1", only_f1_out)
-        _ep.progress(70, text="Preparing Only-in-File2…")
-        b_only2   = _df_to_csv_bytes(run_sig + "|ZIP_ONLY2", only_f2_out)
-        _ep.progress(85, text="Compressing into ZIP…")
-        b_summary = summary_df.to_csv(index=False).encode("utf-8")
+        with st.spinner("Building ZIP…"):
+            b_matched = _df_to_csv_bytes(run_sig + "|ZIP_MATCHED", matched_out)
+            b_mism    = _df_to_csv_bytes(run_sig + "|ZIP_MISM", mismatched_out)
+            b_only1   = _df_to_csv_bytes(run_sig + "|ZIP_ONLY1", only_f1_out)
+            b_only2   = _df_to_csv_bytes(run_sig + "|ZIP_ONLY2", only_f2_out)
+            b_summary = summary_df.to_csv(index=False).encode("utf-8")
 
-        zbio = io.BytesIO()
-        with zipfile.ZipFile(zbio, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr("reco_summary.csv", b_summary)
-            if summary_pdf_bytes:
-                zf.writestr("summary_report.pdf", summary_pdf_bytes)
-            zf.writestr("reco_matched.csv", b_matched)
-            zf.writestr("reco_mismatched.csv", b_mism)
-            zf.writestr("reco_only_in_file1.csv", b_only1)
-            zf.writestr("reco_only_in_file2.csv", b_only2)
+            zbio = io.BytesIO()
+            with zipfile.ZipFile(zbio, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("reco_summary.csv", b_summary)
+                if summary_pdf_bytes:
+                    zf.writestr("summary_report.pdf", summary_pdf_bytes)
+                zf.writestr("reco_matched.csv", b_matched)
+                zf.writestr("reco_mismatched.csv", b_mism)
+                zf.writestr("reco_only_in_file1.csv", b_only1)
+                zf.writestr("reco_only_in_file2.csv", b_only2)
 
-        _ep.progress(100, text="✅ ZIP ready")
-        st.session_state["csv_bytes_zip_all"] = zbio.getvalue()
-        st.session_state["csv_ready_zip_all"] = True
+            st.session_state["csv_bytes_zip_all"] = zbio.getvalue()
+            st.session_state["csv_ready_zip_all"] = True
 
     if st.session_state["csv_ready_zip_all"] and st.session_state["csv_bytes_zip_all"] is not None:
         st.download_button(
@@ -2365,9 +2319,8 @@ with st.expander("✅ Main Excel — Summary + Mismatched + Only-in + Duplicates
         key="btn_prep_excel_main"
     )
     if prepare_main:
-        _ep = st.progress(0, text="Building Main Excel…")
-        _ep.progress(20, text="Writing sheets…")
-        output_main = _build_excel_cached(run_sig + "|MAIN_NO_MATCHED", {
+        with st.spinner("Building MAIN Excel…"):
+            output_main = _build_excel_cached(run_sig + "|MAIN_NO_MATCHED", {
                 "Summary": summary_df,
                 "Key_Diagnostics": key_diag_df,
                 "UploadedFiles_File1": f1_summary,
@@ -2381,7 +2334,6 @@ with st.expander("✅ Main Excel — Summary + Mismatched + Only-in + Duplicates
                 "Duplicate_Keys_File2": dup_rows_2_out,
                 "Duplicate_Keys_BothFiles": dup_both_out,
             })
-        _ep.progress(100, text="✅ Excel ready")
         st.session_state["excel_bytes_main"] = output_main
         st.session_state["excel_sig_main"] = run_sig
         st.session_state["excel_ready_main"] = True
@@ -2404,12 +2356,10 @@ with st.expander(f"📌 Matched Excel only  —  {len(matched_out):,} rows  (opt
         key="btn_prep_excel_matched"
     )
     if prepare_matched:
-        _ep = st.progress(0, text="Building Matched Excel… (may be slow for large files)")
-        _ep.progress(20, text="Writing Matched sheet…")
-        output_matched = _build_excel_cached(run_sig + "|MATCHED_ONLY", {
-            "Matched": matched_out
-        })
-        _ep.progress(100, text="✅ Excel ready")
+        with st.spinner("Building MATCHED Excel… (may take time for large matched rows)"):
+            output_matched = _build_excel_cached(run_sig + "|MATCHED_ONLY", {
+                "Matched": matched_out
+            })
         st.session_state["excel_bytes_matched"] = output_matched
         st.session_state["excel_sig_matched"] = run_sig
         st.session_state["excel_ready_matched"] = True

@@ -2125,6 +2125,38 @@ label.success("✅ Completed")
 
 st.subheader("6) Download")
 
+# ── 📦 Total Download Size Badge — covers ALL prepared files (CSV + Excel)
+#    Updates live as user prepares each file
+_total_bytes = 0
+for _key in [
+    "csv_bytes_matched", "csv_bytes_mismatched",
+    "csv_bytes_only_f1", "csv_bytes_only_f2",
+    "csv_bytes_zip_all",
+    "excel_bytes_main", "excel_bytes_matched",
+]:
+    _b = st.session_state.get(_key)
+    if _b is not None:
+        _total_bytes += len(_b)
+# Summary CSV is always generated inline — add its size too
+_total_bytes += len(summary_df.to_csv(index=False).encode("utf-8"))
+
+_total_mb = _total_bytes / (1024 * 1024)
+_badge_color = "#198754" if _total_mb < 50 else ("#fd7e14" if _total_mb < 200 else "#dc3545")
+st.markdown(
+    f"""<div style="
+        display:inline-block;
+        background:{_badge_color};
+        color:white;
+        padding:6px 14px;
+        border-radius:10px;
+        font-size:13px;
+        font-weight:700;
+        margin-bottom:4px;
+    ">📦 Total prepared download size: {_total_mb:,.2f} MB</div>""",
+    unsafe_allow_html=True
+)
+st.caption("Size updates as you prepare each file below.")
+
 summary_pdf_bytes = out_summary_pdf.read_bytes() if out_summary_pdf.exists() else b""
 
 if summary_pdf_bytes:
@@ -2293,43 +2325,6 @@ with st.expander("📦 One-Click ZIP (All CSVs)", expanded=False):
             mime="application/zip",
             key="dl_zip_all"
         )
-
-st.divider()
-
-# ── 📦 Total Download Size Badge (updates as CSVs are prepared)
-_total_bytes = 0
-_size_parts = []
-for _label, _key in [
-    ("Summary", "csv_bytes_matched"),     # summary is always computed inline, use matched as proxy
-    ("Matched", "csv_bytes_matched"),
-    ("Mismatched", "csv_bytes_mismatched"),
-    ("Only-F1", "csv_bytes_only_f1"),
-    ("Only-F2", "csv_bytes_only_f2"),
-    ("ZIP", "csv_bytes_zip_all"),
-]:
-    _b = st.session_state.get(_key)
-    if _b is not None:
-        _total_bytes += len(_b)
-
-# Always count summary CSV (always generated)
-_summary_bytes_size = len(summary_df.to_csv(index=False).encode("utf-8"))
-_total_bytes += _summary_bytes_size
-
-_total_mb = _total_bytes / (1024 * 1024)
-_badge_color = "#198754" if _total_mb < 50 else ("#fd7e14" if _total_mb < 200 else "#dc3545")
-st.markdown(
-    f"""<div style="
-        display:inline-block;
-        background:{_badge_color};
-        color:white;
-        padding:6px 14px;
-        border-radius:10px;
-        font-size:13px;
-        font-weight:700;
-        margin-bottom:12px;
-    ">📦 Total prepared download size: {_total_mb:,.2f} MB</div>""",
-    unsafe_allow_html=True
-)
 
 st.divider()
 

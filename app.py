@@ -1729,7 +1729,7 @@ if not skip_recompute:
     # show which candidate columns exist (for duplicate tab columns)
     existing_keys_for_display = [c for c in KEY_CANDIDATES_PRIORITY if (c in df1_raw.columns or c in df2_raw.columns)]
     core_first = uniq_list(existing_keys_for_display + ["_KEY", "_KEY_SOURCE_COL", "_SOURCE_FILE", "_SHEET"])
-    candidate_keep = core_first + [c for c in compare_cols if c in common_cols and c not in KEY_CANDIDATES_PRIORITY]
+    candidate_keep = uniq_list(core_first + [c for c in compare_cols if c in common_cols and c not in KEY_CANDIDATES_PRIORITY])
 
     def _filter_dup_df(dfx: pd.DataFrame) -> pd.DataFrame:
         cols = ["Source"] + candidate_keep

@@ -1736,7 +1736,14 @@ if not skip_recompute:
         if dfx is None or dfx.empty:
             return pd.DataFrame(columns=cols)
         cols2 = ["Source"] + [c for c in candidate_keep if c in dfx.columns]
-        return dfx[cols2].copy()
+        # ✅ FIX: deduplicate column list while preserving order
+        seen = set()
+        cols2_dedup = []
+        for c in cols2:
+            if c not in seen:
+                seen.add(c)
+                cols2_dedup.append(c)
+        return dfx[cols2_dedup].copy()
 
     dup_rows_1_out = _filter_dup_df(dup_rows_1)
     dup_rows_2_out = _filter_dup_df(dup_rows_2)

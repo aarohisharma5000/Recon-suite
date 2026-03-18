@@ -1863,33 +1863,34 @@ if not skip_recompute:
     mismatched = both[both["Mismatch_Count"] > 0].copy()
 
     def add_selected_cols_diff_and_text_match(df: pd.DataFrame, selected_cols: list) -> pd.DataFrame:
-        df = df.copy()
+    df = df.copy()
 
-        for col in selected_cols:
-            if col in KEY_CANDIDATES_PRIORITY:
-                continue
+    for col in selected_cols:
+        if col in KEY_CANDIDATES_PRIORITY:
+            continue
 
-            c1 = f"{col}_f1"
-            c2 = f"{col}_f2"
-            if c1 not in df.columns or c2 not in df.columns:
-                continue
+        c1 = f"{col}_f1"
+        c2 = f"{col}_f2"
+        if c1 not in df.columns or c2 not in df.columns:
+            continue
 
-            col_is_numeric = is_numeric_column(df, col)
+        col_is_numeric = is_numeric_column(df, col)
 
-            if col_is_numeric:
-                n1 = pd.to_numeric(df[c1], errors="coerce")
-                n2 = pd.to_numeric(df[c2], errors="coerce")
-                df[f"Diff_{col}_f1-f2"] = (n1 - n2)
-            else:
-                df[f"Diff_{col}_f1-f2"] = ""
-                s1x = df[c1]
-                s2x = df[c2]
-                eq = s1x.astype(str) == s2x.astype(str)
-                if treat_blanks_as_equal:
-                    eq = eq | (s1x.apply(is_blank) & s2x.apply(is_blank))
-                df[f"Match_{col}_f1=f2"] = eq
+        if col_is_numeric:
+            # ✅ Numeric: add Diff only (no Match column needed)
+            n1 = pd.to_numeric(df[c1], errors="coerce")
+            n2 = pd.to_numeric(df[c2], errors="coerce")
+            df[f"Diff_{col}_f1-f2"] = (n1 - n2)
+        else:
+            # ✅ Text: add Match only (no Diff column — avoids #VALUE! in Excel)
+            s1x = df[c1]
+            s2x = df[c2]
+            eq = s1x.astype(str) == s2x.astype(str)
+            if treat_blanks_as_equal:
+                eq = eq | (s1x.apply(is_blank) & s2x.apply(is_blank))
+            df[f"Match_{col}_f1=f2"] = eq
 
-        return df
+    return df
 
     matched    = add_selected_cols_diff_and_text_match(matched, safe_compare_cols)
     mismatched = add_selected_cols_diff_and_text_match(mismatched, safe_compare_cols)
@@ -1914,10 +1915,16 @@ if not skip_recompute:
         d  = f"Diff_{col}_f1-f2"
         m  = f"Match_{col}_f1=f2"
 
-        compare_out_cols += [c1, c2, d]
-        if m in matched.columns:
-            compare_out_cols.append(m)
+        compare_out_cols += [c1, c2]
 
+        # ✅ FIX: only add Diff for numeric cols, only add Match for text cols
+        col_is_num = is_numeric_column(matched, col) if not matched.empty else is_numeric_column(mismatched, col) if not mismatched.empty else False
+        if col_is_num:
+            if d in matched.columns:
+                compare_out_cols.append(d)
+        else:
+            if m in matched.columns:
+                compare_out_cols.append(m)
     extra_cols = ["Mismatch_Count"]
     if not skip_mismatch_columns:
         extra_cols.append("Mismatch_Columns")

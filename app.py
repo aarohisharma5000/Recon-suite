@@ -776,13 +776,12 @@ def _write_table_with_subtotal_and_formulas(ws, df: pd.DataFrame, sheet_title: s
 
         series = df[col] if (len(df) > 0 and col in df.columns) else pd.Series([], dtype="object")
         numeric_series = pd.to_numeric(series, errors="coerce")
-        is_num = numeric_series.notna().any() and (not col.startswith("Match_"))
+        is_num = numeric_series.notna().any() and (not col.startswith("Match_")) and (not col.startswith("Diff_") or col in diff_cols)
         if is_num:
             cell.value = f"=SUBTOTAL(9,{c_letter}3:{c_letter}{last_row})"
         else:
             cell.value = ""
-
-    # Diff formulas
+    # Diff formulas — only for NUMERIC diff columns (skip text columns)
     for diff_col in diff_cols:
         base = diff_col[len("Diff_"):-len("_f1-f2")]
         c1 = f"{base}_f1"
@@ -793,6 +792,18 @@ def _write_table_with_subtotal_and_formulas(ws, df: pd.DataFrame, sheet_title: s
             j2 = col_index[c2]
             L1 = get_column_letter(j1)
             L2 = get_column_letter(j2)
+
+            # ✅ FIX: check if the base column is actually numeric in the dataframe
+            # If the Diff column in df is all blank/None/empty string, skip formula (text column)
+            if diff_col in df.columns:
+                diff_series = df[diff_col]
+                numeric_check = pd.to_numeric(diff_series, errors="coerce")
+                if not numeric_check.notna().any():
+                    # Text column — leave Diff cells blank, do NOT write subtraction formula
+                    for r in range(3, last_row + 1):
+                        ws.cell(row=r, column=diff_j).value = ""
+                    continue
+
             for r in range(3, last_row + 1):
                 ws.cell(row=r, column=diff_j).value = f"={L1}{r}-{L2}{r}"
 

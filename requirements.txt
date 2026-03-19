@@ -9,3 +9,4 @@ pyxlsb
 python-dateutil
 tzdata
 reportlab
+xlrd>=2.0.1

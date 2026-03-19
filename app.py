@@ -2013,26 +2013,28 @@ if not skip_recompute:
             "Remarks": "Only in File2"
         },
         {
-            # ✅ NEW: Duplicates row in summary
+            # ✅ FIX: Count = unique duplicate keys (union), not rows
             "SNO": 5,
             "Particular": focus,
-            "Count": int(len(dup_both_out)),
+            "Count": int(len(dup_union)),
             f"{focus}_f1": float(sum_numeric(dup_rows_1_out.get(focus, pd.Series([], dtype="object")))) if focus in dup_rows_1_out.columns else 0.0,
             f"{focus}_f2": float(sum_numeric(dup_rows_2_out.get(focus, pd.Series([], dtype="object")))) if focus in dup_rows_2_out.columns else 0.0,
             "Diff": 0.0,
-            "Remarks": f"Duplicates (F1 keys:{len(dup_keys_1):,} / F2 keys:{len(dup_keys_2):,})"
+            "Remarks": f"Duplicates (F1 keys:{len(dup_keys_1):,} / F2 keys:{len(dup_keys_2):,}) — INFO ONLY, not in Total"
         },
     ]
     summary_df = pd.DataFrame(summary_rows)
 
+    # ✅ FIX: Exclude SNO 5 (Duplicates) from Total — duplicates are INFO ONLY
+    _summary_for_total = summary_df[summary_df["SNO"].isin([1, 2, 3, 4])]
     total_row = {
         "SNO": "",
         "Particular": "Total",
-        "Count": int(summary_df["Count"].sum()),
-        f"{focus}_f1": float(summary_df[f"{focus}_f1"].sum()),
-        f"{focus}_f2": float(summary_df[f"{focus}_f2"].sum()),
-        "Diff": float(summary_df["Diff"].sum()),
-        "Remarks": ""
+        "Count": int(_summary_for_total["Count"].sum()),
+        f"{focus}_f1": float(_summary_for_total[f"{focus}_f1"].sum()),
+        f"{focus}_f2": float(_summary_for_total[f"{focus}_f2"].sum()),
+        "Diff": float(_summary_for_total["Diff"].sum()),
+        "Remarks": "(Duplicates excluded from Total)"
     }
     summary_df = pd.concat([summary_df, pd.DataFrame([total_row])], ignore_index=True)
 
@@ -2325,7 +2327,7 @@ if "csv_bytes_dups" not in st.session_state:
 if st.session_state.get("csv_sig_last") != run_sig:
     st.session_state["csv_ready_dups"] = False
 
-with st.expander(f"🟡 Duplicates CSV  —  F1: {len(dup_rows_1_out):,} rows | F2: {len(dup_rows_2_out):,} rows | Both: {len(dup_both_out):,} rows", expanded=False):
+with st.expander(f"🟡 Duplicates CSV  —  Unique Dup Keys: {len(dup_union):,} | F1 rows: {len(dup_rows_1_out):,} | F2 rows: {len(dup_rows_2_out):,}", expanded=False):
     st.caption("Contains duplicate keys found in File1, File2, and keys duplicated in both files.")
     if st.button("📄 Prepare Duplicates CSV", disabled=st.session_state["csv_ready_dups"], key="btn_prep_dups"):
         _ep = st.progress(0, text="Building Duplicates CSV…")

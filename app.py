@@ -2012,8 +2012,17 @@ if not skip_recompute:
             "Diff": float(0 - sum_numeric(only_f2_out.get(focus_f2, pd.Series([], dtype="object")))),
             "Remarks": "Only in File2"
         },
+        {
+            # ✅ NEW: Duplicates row in summary
+            "SNO": 5,
+            "Particular": focus,
+            "Count": int(len(dup_both_out)),
+            f"{focus}_f1": float(sum_numeric(dup_rows_1_out.get(focus, pd.Series([], dtype="object")))) if focus in dup_rows_1_out.columns else 0.0,
+            f"{focus}_f2": float(sum_numeric(dup_rows_2_out.get(focus, pd.Series([], dtype="object")))) if focus in dup_rows_2_out.columns else 0.0,
+            "Diff": 0.0,
+            "Remarks": f"Duplicates (F1 keys:{len(dup_keys_1):,} / F2 keys:{len(dup_keys_2):,})"
+        },
     ]
-
     summary_df = pd.DataFrame(summary_rows)
 
     total_row = {
@@ -2305,7 +2314,54 @@ with st.expander(f"➡ Only in File 2 CSV  —  {len(only_f2_out):,} rows", expa
             mime="text/csv",
             key="dl_only2_csv"
         )
+# ── 🟡 Duplicates
+# Init dup CSV session keys if not present
+if "csv_ready_dups" not in st.session_state:
+    st.session_state["csv_ready_dups"] = False
+if "csv_bytes_dups" not in st.session_state:
+    st.session_state["csv_bytes_dups"] = None
 
+# Reset if run changed
+if st.session_state.get("csv_sig_last") != run_sig:
+    st.session_state["csv_ready_dups"] = False
+
+with st.expander(f"🟡 Duplicates CSV  —  F1: {len(dup_rows_1_out):,} rows | F2: {len(dup_rows_2_out):,} rows | Both: {len(dup_both_out):,} rows", expanded=False):
+    st.caption("Contains duplicate keys found in File1, File2, and keys duplicated in both files.")
+    if st.button("📄 Prepare Duplicates CSV", disabled=st.session_state["csv_ready_dups"], key="btn_prep_dups"):
+        _ep = st.progress(0, text="Building Duplicates CSV…")
+        _ep.progress(20, text="Preparing Dup File1…")
+        b_dup1 = _df_to_csv_bytes(run_sig + "|CSV_DUP1", dup_rows_1_out)
+        _ep.progress(50, text="Preparing Dup File2…")
+        b_dup2 = _df_to_csv_bytes(run_sig + "|CSV_DUP2", dup_rows_2_out)
+        _ep.progress(80, text="Preparing Dup Both…")
+        b_dup_both = _df_to_csv_bytes(run_sig + "|CSV_DUP_BOTH", dup_both_out)
+        _ep.progress(100, text="✅ Done")
+        st.session_state["csv_bytes_dups"] = (b_dup1, b_dup2, b_dup_both)
+        st.session_state["csv_ready_dups"] = True
+
+    if st.session_state["csv_ready_dups"] and st.session_state["csv_bytes_dups"] is not None:
+        b_dup1, b_dup2, b_dup_both = st.session_state["csv_bytes_dups"]
+        st.download_button(
+            f"⬇ Download Duplicates File1 ({len(dup_rows_1_out):,} rows)",
+            data=b_dup1,
+            file_name="reco_duplicates_file1.csv",
+            mime="text/csv",
+            key="dl_dup1_csv"
+        )
+        st.download_button(
+            f"⬇ Download Duplicates File2 ({len(dup_rows_2_out):,} rows)",
+            data=b_dup2,
+            file_name="reco_duplicates_file2.csv",
+            mime="text/csv",
+            key="dl_dup2_csv"
+        )
+        st.download_button(
+            f"⬇ Download Duplicates Both Files ({len(dup_both_out):,} rows)",
+            data=b_dup_both,
+            file_name="reco_duplicates_both.csv",
+            mime="text/csv",
+            key="dl_dup_both_csv"
+        )
 # ── 📦 ZIP — One click, all CSVs
 with st.expander("📦 One-Click ZIP (All CSVs)", expanded=False):
     st.caption("Creates a single ZIP: Summary + PDF + Matched + Mismatched + Only-in File1 + Only-in File2")
@@ -2322,6 +2378,10 @@ with st.expander("📦 One-Click ZIP (All CSVs)", expanded=False):
         _ep.progress(85, text="Compressing into ZIP…")
         b_summary = summary_df.to_csv(index=False).encode("utf-8")
 
+        b_dup1_zip  = _df_to_csv_bytes(run_sig + "|ZIP_DUP1", dup_rows_1_out)
+        b_dup2_zip  = _df_to_csv_bytes(run_sig + "|ZIP_DUP2", dup_rows_2_out)
+        b_dupboth_zip = _df_to_csv_bytes(run_sig + "|ZIP_DUP_BOTH", dup_both_out)
+
         zbio = io.BytesIO()
         with zipfile.ZipFile(zbio, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("reco_summary.csv", b_summary)
@@ -2331,6 +2391,10 @@ with st.expander("📦 One-Click ZIP (All CSVs)", expanded=False):
             zf.writestr("reco_mismatched.csv", b_mism)
             zf.writestr("reco_only_in_file1.csv", b_only1)
             zf.writestr("reco_only_in_file2.csv", b_only2)
+            # ✅ NEW: Duplicates in ZIP
+            zf.writestr("reco_duplicates_file1.csv", b_dup1_zip)
+            zf.writestr("reco_duplicates_file2.csv", b_dup2_zip)
+            zf.writestr("reco_duplicates_both.csv", b_dupboth_zip)
 
         _ep.progress(100, text="✅ ZIP ready")
         st.session_state["csv_bytes_zip_all"] = zbio.getvalue()

@@ -1649,6 +1649,7 @@ def progress_update(step, total_steps, msg):
 
 TOTAL_STEPS = 7
 
+
 if has_cached_run:
     # ✅ Reuse outputs (NO recomputation on download click)
     summary_df      = st.session_state["summary_df"]
@@ -1664,6 +1665,10 @@ if has_cached_run:
     miss_cols_f2    = st.session_state["miss_cols_f2"]
     f1_summary      = st.session_state["f1_summary"]
     f2_summary      = st.session_state["f2_summary"]
+    # ✅ FIX: restore dup_union + dup_keys_1 + dup_keys_2 from cache so downloads work
+    dup_union       = st.session_state.get("dup_union", set())
+    dup_keys_1      = st.session_state.get("dup_keys_1", set())
+    dup_keys_2      = st.session_state.get("dup_keys_2", set())
 
     st.info("✅ Using cached Run results (no recomputation on download).")
     progress_update(6, TOTAL_STEPS, "Using cached results (skipping recompute)...")
@@ -2013,12 +2018,11 @@ if not skip_recompute:
             "Remarks": "Only in File2"
         },
         {
-            # ✅ FIX: Count = unique duplicate keys (union), not rows
             "SNO": 5,
             "Particular": focus,
             "Count": int(len(dup_union)),
-            f"{focus}_f1": float(sum_numeric(dup_rows_1_out.get(focus, pd.Series([], dtype="object")))) if focus in dup_rows_1_out.columns else 0.0,
-            f"{focus}_f2": float(sum_numeric(dup_rows_2_out.get(focus, pd.Series([], dtype="object")))) if focus in dup_rows_2_out.columns else 0.0,
+            f"{focus}_f1": 0.0,
+            f"{focus}_f2": 0.0,
             "Diff": 0.0,
             "Remarks": f"Duplicates (F1 keys:{len(dup_keys_1):,} / F2 keys:{len(dup_keys_2):,}) — INFO ONLY, not in Total"
         },
@@ -2103,6 +2107,10 @@ if not skip_recompute:
     st.session_state["dup_rows_1_out"] = dup_rows_1_out
     st.session_state["dup_rows_2_out"] = dup_rows_2_out
     st.session_state["dup_both_out"] = dup_both_out
+    # ✅ FIX: save dup sets so downloads work on cached runs
+    st.session_state["dup_union"]   = dup_union
+    st.session_state["dup_keys_1"]  = dup_keys_1
+    st.session_state["dup_keys_2"]  = dup_keys_2
 
     st.session_state["miss_cols_f1"] = miss_cols_f1
     st.session_state["miss_cols_f2"] = miss_cols_f2

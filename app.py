@@ -847,15 +847,17 @@ def build_excel_bytes(sheets: dict) -> bytes:
 def build_summary_pdf(pdf_path: Path, summary_df: pd.DataFrame, app_version: str, focus_col: str):
     pdf_path = Path(pdf_path)
 
+    from reportlab.lib.pagesizes import landscape, A4
+    _page = landscape(A4)   # ✅ Force landscape explicitly
+
     doc = SimpleDocTemplate(
         str(pdf_path),
-        pagesize=landscape(A4),
-        rightMargin=18 * mm,
-        leftMargin=18 * mm,
-        topMargin=18 * mm,
-        bottomMargin=18 * mm
+        pagesize=_page,
+        rightMargin=12 * mm,
+        leftMargin=12 * mm,
+        topMargin=12 * mm,
+        bottomMargin=12 * mm
     )
-
     styles = getSampleStyleSheet()
     story = []
 
@@ -883,10 +885,11 @@ def build_summary_pdf(pdf_path: Path, summary_df: pd.DataFrame, app_version: str
 
     table_data = [list(df_fmt.columns)] + df_fmt.astype(str).values.tolist()
 
+    # ✅ Landscape A4 width = 277mm, minus margins 24mm = 253mm usable
     tbl = Table(
         table_data,
         repeatRows=1,
-        colWidths=[12*mm, 40*mm, 25*mm, 52*mm, 52*mm, 35*mm, 90*mm]
+        colWidths=[10*mm, 38*mm, 22*mm, 45*mm, 45*mm, 33*mm, 60*mm]
     )
     tbl.setStyle(TableStyle([
         # Header
@@ -2205,9 +2208,14 @@ if not skip_recompute:
             _comp_rows = []
             _remarks_order = ["Match", "Mismatch", "Only in File1", "Only in File2"]
 
+            # ✅ FIX 3: Use SNO 1-4 rows only (exclude SNO 5 duplicates row)
+            # This ensures WITH Dups counts are correct (Match+Mismatch+Only1+Only2)
+            _df_incl_clean = _df_incl[_df_incl["SNO"].isin([1, 2, 3, 4])].copy()
+            _df_excl_clean = _df_excl[_df_excl["SNO"].isin([1, 2, 3, 4])].copy()
+
             for _rem in _remarks_order:
-                _row_incl = _df_incl[_df_incl["Remarks"].str.startswith(_rem, na=False)]
-                _row_excl = _df_excl[_df_excl["Remarks"].str.startswith(_rem, na=False)]
+                _row_incl = _df_incl_clean[_df_incl_clean["Remarks"].str.startswith(_rem, na=False)]
+                _row_excl = _df_excl_clean[_df_excl_clean["Remarks"].str.startswith(_rem, na=False)]
 
                 _cnt_incl = int(_row_incl["Count"].sum()) if not _row_incl.empty else 0
                 _cnt_excl = int(_row_excl["Count"].sum()) if not _row_excl.empty else 0
@@ -2229,7 +2237,20 @@ if not skip_recompute:
                     f"{focus}_f2 (WITHOUT)": round(_f2_excl, 2),
                 })
 
+            # ✅ FIX 2: Add Total row at bottom
+            _comp_rows.append({
+                "Category": "TOTAL",
+                "Count (WITH Dups)": sum(r["Count (WITH Dups)"] for r in _comp_rows),
+                "Count (WITHOUT Dups)": sum(r["Count (WITHOUT Dups)"] for r in _comp_rows),
+                "Count Diff": sum(r["Count Diff"] for r in _comp_rows),
+                f"{focus}_f1 (WITH)": round(sum(r[f"{focus}_f1 (WITH)"] for r in _comp_rows), 2),
+                f"{focus}_f1 (WITHOUT)": round(sum(r[f"{focus}_f1 (WITHOUT)"] for r in _comp_rows), 2),
+                f"{focus}_f2 (WITH)": round(sum(r[f"{focus}_f2 (WITH)"] for r in _comp_rows), 2),
+                f"{focus}_f2 (WITHOUT)": round(sum(r[f"{focus}_f2 (WITHOUT)"] for r in _comp_rows), 2),
+            })
+
             _comp_df = pd.DataFrame(_comp_rows)
+            
             st.dataframe(_comp_df, use_container_width=True, hide_index=True)
 
             # Download comparison table

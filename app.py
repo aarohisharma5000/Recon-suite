@@ -1620,7 +1620,10 @@ RUN_CACHE_KEYS = [
     "only_f1_out", "only_f2_out",
     "dup_rows_1_out", "dup_rows_2_out", "dup_both_out",
     "miss_cols_f1", "miss_cols_f2",
-    "f1_summary", "f2_summary"
+    "f1_summary", "f2_summary",
+    # ✅ ADD these so cached runs have dup counts available
+    "dup_union", "dup_keys_1", "dup_keys_2",
+    "dup_f1_key_count", "dup_f2_key_count"
 ]
 
 has_cached_run = (
@@ -1666,10 +1669,11 @@ if has_cached_run:
     f1_summary      = st.session_state["f1_summary"]
     f2_summary      = st.session_state["f2_summary"]
     # ✅ FIX: restore dup_union + dup_keys_1 + dup_keys_2 from cache so downloads work
-    dup_union       = st.session_state.get("dup_union", set())
-    dup_keys_1      = st.session_state.get("dup_keys_1", set())
-    dup_keys_2      = st.session_state.get("dup_keys_2", set())
-
+    dup_union        = st.session_state.get("dup_union", set())
+    dup_keys_1       = st.session_state.get("dup_keys_1", set())
+    dup_keys_2       = st.session_state.get("dup_keys_2", set())
+    dup_f1_key_count = st.session_state.get("dup_f1_key_count", len(dup_keys_1))
+    dup_f2_key_count = st.session_state.get("dup_f2_key_count", len(dup_keys_2))
     st.info("✅ Using cached Run results (no recomputation on download).")
     progress_update(6, TOTAL_STEPS, "Using cached results (skipping recompute)...")
 
@@ -1736,6 +1740,10 @@ if not skip_recompute:
     dup_union = dup_keys_1.union(dup_keys_2)
     dup_both_keys = dup_union.intersection(keys_in_both)
 
+    # ✅ FIX: store exact unique key counts for summary + downloads
+    dup_f1_key_count = len(dup_keys_1)   # unique keys duplicated in File1
+    dup_f2_key_count = len(dup_keys_2)   # unique keys duplicated in File2
+
     dup_both_1 = df1_raw[df1_raw["_KEY"].isin(dup_both_keys)].copy()
     dup_both_2 = df2_raw[df2_raw["_KEY"].isin(dup_both_keys)].copy()
     dup_both_1.insert(0, "Source", "File1")
@@ -1765,6 +1773,14 @@ if not skip_recompute:
     dup_rows_2_out = _filter_dup_df(dup_rows_2)
     dup_both_out   = _filter_dup_df(dup_both)
 
+    # ✅ FIX: deduplicate dup outputs to ONE ROW PER KEY (for cleaner downloads)
+    # Keep only first occurrence of each duplicate key in each side
+    if not dup_rows_1_out.empty and "_KEY" in dup_rows_1_out.columns:
+        dup_rows_1_out = dup_rows_1_out.drop_duplicates(subset=["_KEY"], keep="first").copy()
+    if not dup_rows_2_out.empty and "_KEY" in dup_rows_2_out.columns:
+        dup_rows_2_out = dup_rows_2_out.drop_duplicates(subset=["_KEY"], keep="first").copy()
+    if not dup_both_out.empty and "_KEY" in dup_both_out.columns:
+        dup_both_out = dup_both_out.drop_duplicates(subset=["_KEY", "Source"], keep="first").copy()
     # -----------------------------
     # Step 2/7: Aggregate + merge (OPTIMIZED)
     # -----------------------------
@@ -2024,7 +2040,7 @@ if not skip_recompute:
             f"{focus}_f1": 0.0,
             f"{focus}_f2": 0.0,
             "Diff": 0.0,
-            "Remarks": f"Duplicates (F1 keys:{len(dup_keys_1):,} / F2 keys:{len(dup_keys_2):,}) — INFO ONLY, not in Total"
+            "Remarks": f"Duplicates (F1:{dup_f1_key_count:,} keys / F2:{dup_f2_key_count:,} keys) — INFO ONLY, not in Total"
         },
     ]
     summary_df = pd.DataFrame(summary_rows)
@@ -2108,10 +2124,11 @@ if not skip_recompute:
     st.session_state["dup_rows_2_out"] = dup_rows_2_out
     st.session_state["dup_both_out"] = dup_both_out
     # ✅ FIX: save dup sets so downloads work on cached runs
-    st.session_state["dup_union"]   = dup_union
-    st.session_state["dup_keys_1"]  = dup_keys_1
-    st.session_state["dup_keys_2"]  = dup_keys_2
-
+    st.session_state["dup_union"]        = dup_union
+    st.session_state["dup_keys_1"]       = dup_keys_1
+    st.session_state["dup_keys_2"]       = dup_keys_2
+    st.session_state["dup_f1_key_count"] = dup_f1_key_count
+    st.session_state["dup_f2_key_count"] = dup_f2_key_count
     st.session_state["miss_cols_f1"] = miss_cols_f1
     st.session_state["miss_cols_f2"] = miss_cols_f2
     st.session_state["f1_summary"] = f1_summary
@@ -2335,7 +2352,7 @@ if "csv_bytes_dups" not in st.session_state:
 if st.session_state.get("csv_sig_last") != run_sig:
     st.session_state["csv_ready_dups"] = False
 
-with st.expander(f"🟡 Duplicates CSV  —  Unique Dup Keys: {len(dup_union):,} | F1 rows: {len(dup_rows_1_out):,} | F2 rows: {len(dup_rows_2_out):,}", expanded=False):
+with st.expander(f"🟡 Duplicates CSV  —  Unique Dup Keys: {len(dup_union):,} | F1 dup keys: {dup_f1_key_count:,} | F2 dup keys: {dup_f2_key_count:,}", expanded=False):
     st.caption("Contains duplicate keys found in File1, File2, and keys duplicated in both files.")
     if st.button("📄 Prepare Duplicates CSV", disabled=st.session_state["csv_ready_dups"], key="btn_prep_dups"):
         _ep = st.progress(0, text="Building Duplicates CSV…")

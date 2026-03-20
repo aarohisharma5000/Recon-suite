@@ -874,17 +874,74 @@ def build_summary_pdf(pdf_path: Path, summary_df: pd.DataFrame, app_version: str
     story.append(subtitle)
     story.append(Spacer(1, 14))
 
+    from reportlab.platypus import Paragraph
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+
+    # ✅ Define styles for wrapped text
+    _style_normal = ParagraphStyle(
+        "normal_wrap",
+        fontSize=8,
+        leading=11,
+        alignment=TA_LEFT,
+        wordWrap="CJK",
+    )
+    _style_center = ParagraphStyle(
+        "center_wrap",
+        fontSize=8,
+        leading=11,
+        alignment=TA_CENTER,
+        wordWrap="CJK",
+    )
+    _style_right = ParagraphStyle(
+        "right_wrap",
+        fontSize=8,
+        leading=11,
+        alignment=TA_RIGHT,
+        wordWrap="CJK",
+    )
+    _style_header = ParagraphStyle(
+        "header_wrap",
+        fontSize=8,
+        leading=11,
+        alignment=TA_CENTER,
+        textColor=colors.white,
+        fontName="Helvetica-Bold",
+        wordWrap="CJK",
+    )
+
     # Format numeric columns to 2 decimals
     df_fmt = summary_df.copy()
-
     for col in df_fmt.columns:
         if pd.api.types.is_numeric_dtype(df_fmt[col]):
             df_fmt[col] = df_fmt[col].apply(
                 lambda x: f"{x:,.2f}" if pd.notnull(x) else ""
             )
 
-    table_data = [list(df_fmt.columns)] + df_fmt.astype(str).values.tolist()
+    # ✅ Build table data with Paragraph objects for text wrapping
+    # Column order: SNO, Particular, Count, f1, f2, Diff, Remarks
+    _cols = list(df_fmt.columns)
+    _header_row = [Paragraph(str(c), _style_header) for c in _cols]
 
+    _data_rows = []
+    for _, row in df_fmt.iterrows():
+        _row_cells = []
+        for i, val in enumerate(row):
+            _val_str = str(val) if val is not None else ""
+            if i == 0:  # SNO
+                _row_cells.append(Paragraph(_val_str, _style_center))
+            elif i == 1:  # Particular
+                _row_cells.append(Paragraph(_val_str, _style_normal))
+            elif i == len(_cols) - 1:  # Remarks (last col)
+                _row_cells.append(Paragraph(_val_str, _style_normal))
+            elif i in [2, 3, 4, 5]:  # Count, f1, f2, Diff
+                _row_cells.append(Paragraph(_val_str, _style_right))
+            else:
+                _row_cells.append(Paragraph(_val_str, _style_normal))
+        _data_rows.append(_row_cells)
+
+    table_data = [_header_row] + _data_rows
+    
     # ✅ Landscape A4 width = 277mm, minus margins 24mm = 253mm usable
     tbl = Table(
         table_data,
@@ -898,19 +955,25 @@ def build_summary_pdf(pdf_path: Path, summary_df: pd.DataFrame, app_version: str
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
 
         # Base table
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        # ✅ WRAP TEXT in all cells — fixes Remarks column truncation
+        ("WORDWRAP", (0, 0), (-1, -1), True),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cfd8e3")),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fbff")]),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
 
         # Alignment
-        ("ALIGN", (0, 0), (-1, 0), "CENTER"),   # header
-        ("ALIGN", (0, 1), (0, -1), "CENTER"),
-        ("ALIGN", (1, 1), (1, -1), "LEFT"),   # SNO + Particular
-        ("ALIGN", (2, 1), (5, -1), "RIGHT"),    # numeric columns
-        ("ALIGN", (6, 1), (6, -1), "CENTER"),   # remarks
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),   # header row
+        ("ALIGN", (0, 1), (0, -1), "CENTER"),   # SNO col
+        ("ALIGN", (1, 1), (1, -1), "LEFT"),     # Particular col
+        ("ALIGN", (2, 1), (2, -1), "RIGHT"),    # Count col
+        ("ALIGN", (3, 1), (4, -1), "RIGHT"),    # f1 + f2 cols
+        ("ALIGN", (5, 1), (5, -1), "RIGHT"),    # Diff col
+        ("ALIGN", (6, 1), (6, -1), "LEFT"),     # ✅ Remarks LEFT so wrap looks natural
 
         # Bold total row
         ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),

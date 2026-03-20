@@ -886,7 +886,7 @@ def build_summary_pdf(pdf_path: Path, summary_df: pd.DataFrame, app_version: str
     tbl = Table(
         table_data,
         repeatRows=1,
-        colWidths=[12*mm, 40*mm, 30*mm, 50*mm, 50*mm, 38*mm, 60*mm]
+        colWidths=[12*mm, 40*mm, 25*mm, 52*mm, 52*mm, 35*mm, 90*mm]
     )
     tbl.setStyle(TableStyle([
         # Header
@@ -1674,6 +1674,8 @@ if has_cached_run:
     dup_keys_2       = st.session_state.get("dup_keys_2", set())
     dup_f1_key_count = st.session_state.get("dup_f1_key_count", len(dup_keys_1))
     dup_f2_key_count = st.session_state.get("dup_f2_key_count", len(dup_keys_2))
+    _has_dups        = st.session_state.get("_has_dups", False)
+    _exclude_dups    = st.session_state.get("_exclude_dups", False)
     st.info("✅ Using cached Run results (no recomputation on download).")
     progress_update(6, TOTAL_STEPS, "Using cached results (skipping recompute)...")
 
@@ -1781,6 +1783,71 @@ if not skip_recompute:
         dup_rows_2_out = dup_rows_2_out.drop_duplicates(subset=["_KEY"], keep="first").copy()
     if not dup_both_out.empty and "_KEY" in dup_both_out.columns:
         dup_both_out = dup_both_out.drop_duplicates(subset=["_KEY", "Source"], keep="first").copy()
+    
+    # ============================================================
+    # ✅ DUPLICATE HANDLING SECTION
+    # ============================================================
+    _has_dups = len(dup_union) > 0
+
+    if _has_dups:
+        st.warning(
+            f"⚠️ **Duplicates Detected** — "
+            f"F1: {dup_f1_key_count:,} duplicate keys | "
+            f"F2: {dup_f2_key_count:,} duplicate keys | "
+            f"Union: {len(dup_union):,} unique duplicate keys found in both sides."
+        )
+
+        with st.expander("📊 Duplicate Impact Preview — click to see which keys are duplicated", expanded=False):
+            dc1, dc2, dc3 = st.columns(3)
+            dc1.metric("Dup keys in File1", f"{dup_f1_key_count:,}")
+            dc2.metric("Dup keys in File2", f"{dup_f2_key_count:,}")
+            dc3.metric("Dup keys in Union", f"{len(dup_union):,}")
+            st.caption("Top duplicate keys (File1):")
+            st.dataframe(dup_rows_1_out.head(20), use_container_width=True, hide_index=True)
+
+        dup_mode = st.radio(
+            "🔀 How do you want to handle duplicates in reconciliation?",
+            options=[
+                "✅ Include duplicates — aggregate/sum duplicate rows (recommended for transactions)",
+                "🚫 Exclude duplicates — remove all duplicate keys from BOTH sides before reco"
+            ],
+            index=0,
+            key="dup_mode_radio"
+        )
+        _exclude_dups = "Exclude" in dup_mode
+
+        if _exclude_dups:
+            _before_f1 = len(df1_raw)
+            _before_f2 = len(df2_raw)
+            df1_raw = df1_raw[~df1_raw["_KEY"].isin(dup_union)].copy()
+            df2_raw = df2_raw[~df2_raw["_KEY"].isin(dup_union)].copy()
+            st.info(
+                f"🚫 Duplicate keys removed — "
+                f"F1: {_before_f1:,} → {len(df1_raw):,} rows kept | "
+                f"F2: {_before_f2:,} → {len(df2_raw):,} rows kept | "
+                f"Removed: {_before_f1 - len(df1_raw):,} F1 rows + "
+                f"{_before_f2 - len(df2_raw):,} F2 rows"
+            )
+    else:
+        _exclude_dups = False
+        st.success("✅ No duplicates found in either file.")
+
+    # ============================================================
+    # ✅ BEFORE vs AFTER COMPARISON (only shown if dups exist)
+    # Store whether this run was with or without duplicates
+    # ============================================================
+    st.session_state["dup_exclude_mode"] = _exclude_dups
+    st.session_state["dup_union_count"]  = len(dup_union)
+
+    # -----------------------------
+    # Step 2/7: Aggregate + merge (OPTIMIZED)
+    # -----------------------------
+    progress_update(2, TOTAL_STEPS, "Aggregating duplicates (optimized) + building merged view...")
+
+
+
+
+    
     # -----------------------------
     # Step 2/7: Aggregate + merge (OPTIMIZED)
     # -----------------------------
@@ -2061,6 +2128,90 @@ if not skip_recompute:
     out_summary_pdf = Path("summary_report_tool1.pdf")
     build_summary_pdf(out_summary_pdf, summary_df, APP_VERSION, focus)
 
+    out_summary_pdf = Path("summary_report_tool1.pdf")
+    build_summary_pdf(out_summary_pdf, summary_df, APP_VERSION, focus)
+
+    # ============================================================
+    # ✅ BEFORE vs AFTER DUPLICATE COMPARISON TABLE
+    # Only shown if duplicates exist
+    # ============================================================
+    if _has_dups:
+        # Save this run's summary with label
+        _run_label = "🚫 WITHOUT Duplicates" if _exclude_dups else "✅ WITH Duplicates (aggregated)"
+        st.session_state[f"summary_{'excl' if _exclude_dups else 'incl'}_dups"] = summary_df.copy()
+        st.session_state[f"summary_{'excl' if _exclude_dups else 'incl'}_label"] = _run_label
+
+        # Show comparison only if BOTH versions are available
+        _have_incl = "summary_incl_dups" in st.session_state
+        _have_excl = "summary_excl_dups" in st.session_state
+
+        if _have_incl and _have_excl:
+            st.subheader("📊 Before vs After Duplicate Removal Comparison")
+            st.caption(
+                "This table compares reconciliation results WITH duplicates (aggregated) "
+                "vs WITHOUT duplicates (duplicate keys fully removed from both sides)."
+            )
+
+            _df_incl = st.session_state["summary_incl_dups"]
+            _df_excl = st.session_state["summary_excl_dups"]
+
+            # Build side-by-side comparison
+            _focus_f1 = f"{focus}_f1"
+            _focus_f2 = f"{focus}_f2"
+
+            _comp_rows = []
+            _remarks_order = ["Match", "Mismatch", "Only in File1", "Only in File2"]
+
+            for _rem in _remarks_order:
+                _row_incl = _df_incl[_df_incl["Remarks"].str.startswith(_rem, na=False)]
+                _row_excl = _df_excl[_df_excl["Remarks"].str.startswith(_rem, na=False)]
+
+                _cnt_incl = int(_row_incl["Count"].sum()) if not _row_incl.empty else 0
+                _cnt_excl = int(_row_excl["Count"].sum()) if not _row_excl.empty else 0
+
+                _f1_incl = float(_row_incl[_focus_f1].sum()) if (not _row_incl.empty and _focus_f1 in _row_incl.columns) else 0.0
+                _f1_excl = float(_row_excl[_focus_f1].sum()) if (not _row_excl.empty and _focus_f1 in _row_excl.columns) else 0.0
+
+                _f2_incl = float(_row_incl[_focus_f2].sum()) if (not _row_incl.empty and _focus_f2 in _row_incl.columns) else 0.0
+                _f2_excl = float(_row_excl[_focus_f2].sum()) if (not _row_excl.empty and _focus_f2 in _row_excl.columns) else 0.0
+
+                _comp_rows.append({
+                    "Category": _rem,
+                    "Count (WITH Dups)": _cnt_incl,
+                    "Count (WITHOUT Dups)": _cnt_excl,
+                    "Count Diff": _cnt_incl - _cnt_excl,
+                    f"{focus}_f1 (WITH)": round(_f1_incl, 2),
+                    f"{focus}_f1 (WITHOUT)": round(_f1_excl, 2),
+                    f"{focus}_f2 (WITH)": round(_f2_incl, 2),
+                    f"{focus}_f2 (WITHOUT)": round(_f2_excl, 2),
+                })
+
+            _comp_df = pd.DataFrame(_comp_rows)
+            st.dataframe(_comp_df, use_container_width=True, hide_index=True)
+
+            # Download comparison table
+            _comp_csv = _comp_df.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "⬇ Download Before vs After Comparison (CSV)",
+                data=_comp_csv,
+                file_name="reco_before_vs_after_dup_comparison.csv",
+                mime="text/csv",
+                key="dl_comp_csv"
+            )
+
+        elif _have_incl and not _have_excl:
+            st.info(
+                "💡 **Tip:** You are viewing results WITH duplicates included. "
+                "To see the Before vs After comparison, re-run with "
+                "'🚫 Exclude duplicates' option selected above."
+            )
+        elif _have_excl and not _have_incl:
+            st.info(
+                "💡 **Tip:** You are viewing results WITHOUT duplicates. "
+                "To see the Before vs After comparison, re-run with "
+                "'✅ Include duplicates' option selected above."
+            )
+
     key_diag_df = pd.DataFrame([{
         "Mode": "COALESCE key (no detection)",
         "KeyPriority": " / ".join(existing_key_candidates),
@@ -2129,6 +2280,8 @@ if not skip_recompute:
     st.session_state["dup_keys_2"]       = dup_keys_2
     st.session_state["dup_f1_key_count"] = dup_f1_key_count
     st.session_state["dup_f2_key_count"] = dup_f2_key_count
+    st.session_state["_has_dups"]        = _has_dups
+    st.session_state["_exclude_dups"]    = _exclude_dups
     st.session_state["miss_cols_f1"] = miss_cols_f1
     st.session_state["miss_cols_f2"] = miss_cols_f2
     st.session_state["f1_summary"] = f1_summary

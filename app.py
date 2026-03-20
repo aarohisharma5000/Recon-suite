@@ -1810,10 +1810,11 @@ if not skip_recompute:
 
     if _has_dups:
         st.warning(
-            f"⚠️ **Duplicates Detected** — "
-            f"F1: {dup_f1_key_count:,} duplicate keys | "
-            f"F2: {dup_f2_key_count:,} duplicate keys | "
-            f"Union: {len(dup_union):,} unique duplicate keys found in both sides."
+            f"⚠️ **Duplicate rows detected** — "
+            f"F1: {dup_f1_key_count:,} keys have duplicates "
+            f"({len(df1_raw) - len(df1_raw.drop_duplicates(subset=['_KEY'])):,} extra rows) | "
+            f"F2: {dup_f2_key_count:,} keys have duplicates "
+            f"({len(df2_raw) - len(df2_raw.drop_duplicates(subset=['_KEY'])):,} extra rows)"
         )
 
         with st.expander("📊 Duplicate Impact Preview — click to see which keys are duplicated", expanded=False):
@@ -1827,8 +1828,8 @@ if not skip_recompute:
         dup_mode = st.radio(
             "🔀 How do you want to handle duplicates in reconciliation?",
             options=[
-                "✅ Include duplicates — aggregate/sum duplicate rows (recommended for transactions)",
-                "🚫 Exclude duplicates — remove all duplicate keys from BOTH sides before reco"
+                "✅ Include duplicates — SUM all rows per key before comparing (recommended for monthly data)",
+                "🚫 Exclude duplicates — keep only FIRST row per duplicate key, remove extra rows"
             ],
             index=0,
             key="dup_mode_radio"
@@ -1838,41 +1839,28 @@ if not skip_recompute:
         if _exclude_dups:
             _before_f1 = len(df1_raw)
             _before_f2 = len(df2_raw)
-            df1_raw = df1_raw[~df1_raw["_KEY"].isin(dup_union)].copy()
-            df2_raw = df2_raw[~df2_raw["_KEY"].isin(dup_union)].copy()
+
+            # ✅ CORRECT APPROACH: Keep only FIRST occurrence of each duplicate key
+            # This removes EXTRA duplicate rows but keeps ONE row per key
+            # So if a key appears 3 times → keep 1, remove 2 extra rows
+            df1_raw = df1_raw.drop_duplicates(subset=["_KEY"], keep="first").copy()
+            df2_raw = df2_raw.drop_duplicates(subset=["_KEY"], keep="first").copy()
+
             _after_f1 = len(df1_raw)
             _after_f2 = len(df2_raw)
+            _removed_f1 = _before_f1 - _after_f1
+            _removed_f2 = _before_f2 - _after_f2
 
             st.info(
-                f"🚫 Duplicate keys removed — "
+                f"🚫 Extra duplicate rows removed (kept first occurrence per key) — \n"
                 f"F1: {_before_f1:,} → {_after_f1:,} rows kept | "
+                f"Removed {_removed_f1:,} extra rows | \n"
                 f"F2: {_before_f2:,} → {_after_f2:,} rows kept | "
-                f"Removed: {_before_f1 - _after_f1:,} F1 rows + "
-                f"{_before_f2 - _after_f2:,} F2 rows"
+                f"Removed {_removed_f2:,} extra rows"
             )
 
-            # ✅ FIX: Warn user if excluding dups leaves nothing to reconcile
-            if _after_f1 == 0 and _after_f2 == 0:
-                st.error(
-                    "❌ **After removing duplicate keys, NO records remain on either side.** \n\n"
-                    "This means ALL records in your files share keys that appear more than once. \n\n"
-                    "**What this means for your data:**\n"
-                    "- Every loan account number appears in multiple rows (e.g. Oct, Nov, Dec months)\n"
-                    "- This is NORMAL for monthly transaction files\n"
-                    "- **Recommendation: Use '✅ Include duplicates' mode** — the tool will SUM "
-                    "all rows per key before comparing, which is the correct approach for your data.\n\n"
-                    "The 'Exclude' option is only useful when duplicates are genuine data errors "
-                    "(e.g. a record was accidentally uploaded twice)."
-                )
-                st.stop()
-
-            elif _after_f1 == 0 or _after_f2 == 0:
-                st.warning(
-                    f"⚠️ After removing duplicate keys, "
-                    f"{'File 1' if _after_f1 == 0 else 'File 2'} has 0 rows remaining. "
-                    f"Reconciliation will show all records as Only-in-{'File2' if _after_f1 == 0 else 'File1'}. "
-                    f"Consider using Include duplicates mode instead."
-                )
+            if _removed_f1 == 0 and _removed_f2 == 0:
+                st.info("✅ No extra duplicate rows found — both files already have unique keys.")
     else:
         _exclude_dups = False
         st.success("✅ No duplicates found in either file.")

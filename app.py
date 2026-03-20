@@ -972,27 +972,22 @@ if st.session_state.get("files_sig") != sig:
     except Exception as e:
         st.error(f"Error reading files: {e}")
         st.stop()
-
     st.session_state["files_sig"] = sig
     st.session_state["df1"] = df1
     st.session_state["df2"] = df2
     st.session_state["f1_summary"] = f1_summary
     st.session_state["f2_summary"] = f2_summary
     st.session_state["confirmed_sig"] = None
-
     # ✅ Reset run state when uploads change
     st.session_state["run_done"] = False
-
     # MAIN (no matched) cache reset
     st.session_state["excel_ready_main"] = False
     st.session_state["excel_bytes_main"] = None
     st.session_state["excel_sig_main"] = None
-
     # MATCHED-only cache reset
     st.session_state["excel_ready_matched"] = False
     st.session_state["excel_bytes_matched"] = None
     st.session_state["excel_sig_matched"] = None
-
     # ✅ PATCH-3: Reset RUN cache when uploads change (prevents stale cached results)
     st.session_state["run_cache_ready"] = False
     st.session_state["run_cache_sig"] = None
@@ -1007,6 +1002,26 @@ if st.session_state.get("files_sig") != sig:
         if k in st.session_state:
             del st.session_state[k]
 
+    # ✅ FIX 1: Reset dup mode radio and comparison cache when new files uploaded
+    # This fixes the issue where Back to Launcher + relaunch keeps stale dup state
+    for k in [
+        "dup_mode_radio",
+        "summary_incl_dups",
+        "summary_excl_dups",
+        "summary_incl_label",
+        "summary_excl_label",
+        "_has_dups",
+        "_exclude_dups",
+        "dup_exclude_mode",
+        "dup_union_count",
+        "dup_union",
+        "dup_keys_1",
+        "dup_keys_2",
+        "dup_f1_key_count",
+        "dup_f2_key_count",
+    ]:
+        if k in st.session_state:
+            del st.session_state[k]
     # (Optional but recommended) Reset CSV cache on upload change
     for k in [
         "csv_sig_last",
@@ -1825,13 +1840,39 @@ if not skip_recompute:
             _before_f2 = len(df2_raw)
             df1_raw = df1_raw[~df1_raw["_KEY"].isin(dup_union)].copy()
             df2_raw = df2_raw[~df2_raw["_KEY"].isin(dup_union)].copy()
+            _after_f1 = len(df1_raw)
+            _after_f2 = len(df2_raw)
+
             st.info(
                 f"🚫 Duplicate keys removed — "
-                f"F1: {_before_f1:,} → {len(df1_raw):,} rows kept | "
-                f"F2: {_before_f2:,} → {len(df2_raw):,} rows kept | "
-                f"Removed: {_before_f1 - len(df1_raw):,} F1 rows + "
-                f"{_before_f2 - len(df2_raw):,} F2 rows"
+                f"F1: {_before_f1:,} → {_after_f1:,} rows kept | "
+                f"F2: {_before_f2:,} → {_after_f2:,} rows kept | "
+                f"Removed: {_before_f1 - _after_f1:,} F1 rows + "
+                f"{_before_f2 - _after_f2:,} F2 rows"
             )
+
+            # ✅ FIX: Warn user if excluding dups leaves nothing to reconcile
+            if _after_f1 == 0 and _after_f2 == 0:
+                st.error(
+                    "❌ **After removing duplicate keys, NO records remain on either side.** \n\n"
+                    "This means ALL records in your files share keys that appear more than once. \n\n"
+                    "**What this means for your data:**\n"
+                    "- Every loan account number appears in multiple rows (e.g. Oct, Nov, Dec months)\n"
+                    "- This is NORMAL for monthly transaction files\n"
+                    "- **Recommendation: Use '✅ Include duplicates' mode** — the tool will SUM "
+                    "all rows per key before comparing, which is the correct approach for your data.\n\n"
+                    "The 'Exclude' option is only useful when duplicates are genuine data errors "
+                    "(e.g. a record was accidentally uploaded twice)."
+                )
+                st.stop()
+
+            elif _after_f1 == 0 or _after_f2 == 0:
+                st.warning(
+                    f"⚠️ After removing duplicate keys, "
+                    f"{'File 1' if _after_f1 == 0 else 'File 2'} has 0 rows remaining. "
+                    f"Reconciliation will show all records as Only-in-{'File2' if _after_f1 == 0 else 'File1'}. "
+                    f"Consider using Include duplicates mode instead."
+                )
     else:
         _exclude_dups = False
         st.success("✅ No duplicates found in either file.")
@@ -2140,11 +2181,21 @@ if not skip_recompute:
     # Only shown if duplicates exist
     # ============================================================
     if _has_dups:
-        # Save this run's summary with label
         _run_label = "🚫 WITHOUT Duplicates" if _exclude_dups else "✅ WITH Duplicates (aggregated)"
-        st.session_state[f"summary_{'excl' if _exclude_dups else 'incl'}_dups"] = summary_df.copy()
-        st.session_state[f"summary_{'excl' if _exclude_dups else 'incl'}_label"] = _run_label
 
+        # ✅ FIX: Only save excl summary if it has meaningful data (not all zeros)
+        _total_count = int(summary_df[summary_df["SNO"].isin([1,2,3,4])]["Count"].sum())
+
+        if _exclude_dups and _total_count == 0:
+            st.warning(
+                "⚠️ The WITHOUT duplicates run produced 0 records — "
+                "Before vs After comparison will not be shown. "
+                "This means all your records have duplicate keys. "
+                "Use Include mode for meaningful reconciliation."
+            )
+        else:
+            st.session_state[f"summary_{'excl' if _exclude_dups else 'incl'}_dups"] = summary_df.copy()
+            st.session_state[f"summary_{'excl' if _exclude_dups else 'incl'}_label"] = _run_label
         # Show comparison only if BOTH versions are available
         _have_incl = "summary_incl_dups" in st.session_state
         _have_excl = "summary_excl_dups" in st.session_state

@@ -1603,6 +1603,9 @@ _filter_sig = (
     ",".join(sorted([str(v).strip().upper() for v in filter_values])) if filter_enabled else "nofilter"
 )
 
+# ✅ Include dup_mode in signature so switching Include/Exclude triggers fresh run
+_dup_mode_sig = str(st.session_state.get("dup_mode_radio", "Include"))
+
 run_inputs_sig = (
     str(st.session_state.get("files_sig")) + "|" +
     str(reco_focus_col) + "|" +
@@ -1611,7 +1614,8 @@ run_inputs_sig = (
     str(float(numeric_tolerance)) + "|" +
     str(bool(treat_blanks_as_equal)) + "|" +
     str(bool(skip_mismatch_columns)) + "|" +
-    _filter_sig
+    _filter_sig + "|" +
+    _dup_mode_sig
 )
 
 RUN_CACHE_KEYS = [
@@ -1621,11 +1625,11 @@ RUN_CACHE_KEYS = [
     "dup_rows_1_out", "dup_rows_2_out", "dup_both_out",
     "miss_cols_f1", "miss_cols_f2",
     "f1_summary", "f2_summary",
-    # ✅ ADD these so cached runs have dup counts available
     "dup_union", "dup_keys_1", "dup_keys_2",
-    "dup_f1_key_count", "dup_f2_key_count"
+    "dup_f1_key_count", "dup_f2_key_count",
+    # ✅ ADD: track which mode was used so UI shows correct tip
+    "_has_dups", "_exclude_dups"
 ]
-
 has_cached_run = (
     st.session_state.get("run_cache_sig") == run_inputs_sig and
     st.session_state.get("run_cache_ready") is True and
@@ -2201,11 +2205,11 @@ if not skip_recompute:
 
         elif _have_incl and not _have_excl:
             st.info(
-                "💡 **Tip:** You are viewing results WITH duplicates included. "
-                "To see the Before vs After comparison, re-run with "
-                "'🚫 Exclude duplicates' option selected above."
-            )
-        elif _have_excl and not _have_incl:
+                "💡 **Tip:** You are viewing results **WITH duplicates included**. "
+                "To see the Before vs After comparison:\n\n"
+                "1️⃣ Select **'🚫 Exclude duplicates'** option in the radio above\n\n"
+                "2️⃣ Click **'✅ Run Reco'** button again"
+            )        elif _have_excl and not _have_incl:
             st.info(
                 "💡 **Tip:** You are viewing results WITHOUT duplicates. "
                 "To see the Before vs After comparison, re-run with "
@@ -2223,14 +2227,16 @@ if not skip_recompute:
     # -----------------------------
     progress_update(6, TOTAL_STEPS, "Rendering outputs...")
 
-    k1, k2, k3, k4, k5, k6 = st.columns(6)
+    # ✅ Show which duplicate mode is active
+    _mode_label = "🚫 Excl. Dups" if _exclude_dups else "✅ Incl. Dups"
+    k1, k2, k3, k4, k5, k6, k7 = st.columns(7)
     k1.metric("Key Mode", "COALESCE")
-    k2.metric("Matched", f"{len(matched_out):,}")
-    k3.metric("Mismatched", f"{len(mismatched_out):,}")
-    k4.metric("Only in File1", f"{len(only_f1_out):,}")
-    k5.metric("Only in File2", f"{len(only_f2_out):,}")
-    k6.metric("Duplicate Keys (union)", f"{len(dup_union):,}")
-
+    k2.metric("Dup Mode", _mode_label)
+    k3.metric("Matched", f"{len(matched_out):,}")
+    k4.metric("Mismatched", f"{len(mismatched_out):,}")
+    k5.metric("Only in File1", f"{len(only_f1_out):,}")
+    k6.metric("Only in File2", f"{len(only_f2_out):,}")
+    k7.metric("Duplicate Keys (union)", f"{len(dup_union):,}")
     st.subheader("4) Summary")
     st.dataframe(summary_df, use_container_width=True, hide_index=True)
 

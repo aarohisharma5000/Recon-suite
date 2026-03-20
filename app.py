@@ -2209,7 +2209,8 @@ if not skip_recompute:
                 "To see the Before vs After comparison:\n\n"
                 "1️⃣ Select **'🚫 Exclude duplicates'** option in the radio above\n\n"
                 "2️⃣ Click **'✅ Run Reco'** button again"
-            )        elif _have_excl and not _have_incl:
+            )        
+        elif _have_excl and not _have_incl:
             st.info(
                 "💡 **Tip:** You are viewing results WITHOUT duplicates. "
                 "To see the Before vs After comparison, re-run with "

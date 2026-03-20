@@ -874,10 +874,9 @@ def build_summary_pdf(pdf_path: Path, summary_df: pd.DataFrame, app_version: str
     story.append(subtitle)
     story.append(Spacer(1, 14))
 
-    from reportlab.platypus import Paragraph
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
-
+    
     # ✅ Define styles for wrapped text
     _style_normal = ParagraphStyle(
         "normal_wrap",

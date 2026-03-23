@@ -582,21 +582,58 @@ _KEY_HINTS = [
 ]
 
 def suggest_key_candidates(cols: list, top_k: int = 5) -> list:
-    """Score column names and return best-guess key columns."""
+    """
+    Score column names and return best-guess key columns.
+    Works for both standard names (loan account number) 
+    and custom names (Reco, ID, Key, Reference etc.)
+    """
     scored = []
     for c in cols:
         n = re.sub(r"[^a-z0-9]+", "", str(c).strip().lower())
         score = 0
+
+        # ✅ Standard finance key hints — high score
         for h in _KEY_HINTS:
             if h in n:
                 score += 10
-        if n.endswith("id") or n.endswith("number"):
-            score += 2
-        if any(x in n for x in ["date", "amount", "sum", "balance", "rate"]):
+
+        # ✅ Generic key-like endings
+        if n.endswith("id") or n.endswith("number") or n.endswith("no"):
+            score += 3
+        if n.endswith("key") or n.endswith("code") or n.endswith("ref"):
+            score += 3
+
+        # ✅ Generic key-like prefixes
+        if n.startswith("key") or n.startswith("id") or n.startswith("ref"):
+            score += 3
+        if n.startswith("reco") or n.startswith("unique") or n.startswith("primary"):
+            score += 5
+
+        # ✅ Short column names that look like keys (Reco, ID, Key, Ref)
+        if len(n) <= 6 and any(x in n for x in ["reco", "key", "id", "ref", "lan", "acc"]):
+            score += 5
+
+        # ✅ Columns with numbers at end suggest versioning (Reco 1, ID2)
+        # Give them lower priority than exact match but still include
+        if re.match(r"^[a-z]+\d+$", n):
+            score += 1
+
+        # ✅ Penalize obvious non-key columns
+        if any(x in n for x in [
+            "date", "amount", "sum", "balance", "rate",
+            "bonus", "target", "bcf", "collection",
+            "status", "tenure", "roi", "principal",
+            "outstanding", "pos", "dpd", "closure",
+            "disbursal", "month", "year", "flag"
+        ]):
             score -= 5
+
         scored.append((score, c))
+
     scored.sort(key=lambda x: (-x[0], str(x[1]).lower()))
-    return [c for sc, c in scored if sc >= 2][:top_k]
+
+    # ✅ Return top_k with score >= 1 (lowered from 2 to catch custom names)
+    return [c for sc, c in scored if sc >= 1][:top_k]
 
 def _norm_col_name(x: str):
     x = str(x).replace("\u00A0", " ").replace("\u200B", "")
@@ -1227,18 +1264,26 @@ for cand in KEY_CANDIDATES_PRIORITY:
 existing_key_candidates = _dedup(existing_key_candidates)
 
 # ✅ Step 2: if none found, smart-suggest from column names
-auto_suggest = existing_key_candidates if existing_key_candidates else _dedup(suggest_key_candidates(common_cols, top_k=5))
-
+# This now works for custom column names like Reco, Reco 1, ID, Reference etc.
+auto_suggest = existing_key_candidates if existing_key_candidates else _dedup(suggest_key_candidates(common_cols, top_k=3))
 st.markdown("### 🔑 Key Column (used for matching rows)")
 
 if existing_key_candidates:
     st.success("✅ Default key column(s) found → " + " / ".join(existing_key_candidates))
 else:
-    st.warning(
-        "Default key names not found. "
-        "Please select the correct key column(s) from the list below."
-    )
-
+    # ✅ Show smart suggestions even when default names not found
+    _smart_suggest = suggest_key_candidates(common_cols, top_k=5)
+    if _smart_suggest:
+        st.warning(
+            f"⚠️ Default key names (like 'Lender Loan Account Number') not found in your files. \n\n"
+            f"**Smart suggestion based on your column names:** {' / '.join(_smart_suggest)} \n\n"
+            f"Please select the correct key column(s) from the multiselect below."
+        )
+    else:
+        st.warning(
+            "⚠️ Could not auto-detect key columns. "
+            "Please manually select the correct key column(s) from the list below."
+        )
 with st.expander("ℹ️ How COALESCE key works"):
     st.write(
         "The tool builds a single _KEY as the first non-blank value from your selected "
@@ -1614,7 +1659,9 @@ def build_selected_field_summary_before_run(df_side: pd.DataFrame, focus_col: st
     if "_SHEET" not in tmp.columns:
         tmp["_SHEET"] = "UNKNOWN"
 
-    raw_key, src_col = build_effective_key(tmp, KEY_CANDIDATES_PRIORITY)
+    # ✅ Use user-selected keys not hardcoded list
+    _key_priority = existing_key_candidates if existing_key_candidates else KEY_CANDIDATES_PRIORITY
+    raw_key, src_col = build_effective_key(tmp, _key_priority)
     tmp["_KEY_TMP_SOURCE_COL"] = src_col
     tmp["_KEY_TMP"] = clean_key_series(raw_key, treat_as_text=True)
 
@@ -1791,9 +1838,12 @@ if not skip_recompute:
                 st.error("⚠️ Filter returned 0 rows on one or both sides. Please check your filter value.")
                 st.stop()
 
-    raw1, src1 = build_effective_key(df1_raw, KEY_CANDIDATES_PRIORITY)
-    raw2, src2 = build_effective_key(df2_raw, KEY_CANDIDATES_PRIORITY)
-
+    # ✅ FIX: Use SELECTED key columns (existing_key_candidates) not hardcoded list
+    # This means if user selects "Reco" and "Reco 1" those will be used as keys
+    # existing_key_candidates is already set from user selection above
+    _runtime_key_priority = existing_key_candidates if existing_key_candidates else KEY_CANDIDATES_PRIORITY
+    raw1, src1 = build_effective_key(df1_raw, _runtime_key_priority)
+    raw2, src2 = build_effective_key(df2_raw, _runtime_key_priority)
     df1_raw["_KEY_SOURCE_COL"] = src1
     df2_raw["_KEY_SOURCE_COL"] = src2
 

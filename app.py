@@ -48,8 +48,8 @@ show_help = st.toggle("📘 Show Help & User Guide", value=False, key="toggle_he
 # 🔹 App Meta + Layout (PASTE ONCE, NEVER TOUCH AGAIN)
 # ============================================================
 
-APP_VERSION  = "v1.5"
-LAST_UPDATED = "2026-02-03"
+APP_VERSION  = "v1.6"
+LAST_UPDATED = "2026-03-23"
 COMPANY_NAME = "Reconciliation Suite"
 
 # ---------- Title ----------

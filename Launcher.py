@@ -92,7 +92,7 @@ TOOLS = {
         "name": "Tool 2",
         "desc": "Recon Tool 2 (app_v2.py)",
         "icon": "🧠",
-        "version": "v2.0",
+        "version": "v2.1",
         "path": BASE / "app_v2.py",
         "deps": ["streamlit", "pandas", "duckdb", "pyarrow"],
         "tag": "Big File",
@@ -181,60 +181,55 @@ html(f"""
     margin:0 0 14px 0; display:flex; align-items:center; gap:8px;
   }}
 
-  /* ── Tool Card ── */
+  /* ── Tool Card — COMPACT ── */
   .tool-card {{
     border:1.5px solid var(--border);
-    border-radius:20px;
-    padding:20px;
+    border-radius:16px;
+    padding:14px 16px;
     background:var(--panel);
     transition:transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
-    height:100%;
   }}
   .tool-card:hover {{
-    transform:translateY(-3px);
-    box-shadow:0 14px 32px var(--shadow);
+    transform:translateY(-2px);
+    box-shadow:0 8px 24px var(--shadow);
   }}
   .tool-card.selected {{
     border:2px solid var(--brand);
     background:var(--panel2);
-    box-shadow:0 10px 30px var(--shadow);
+    box-shadow:0 6px 20px var(--shadow);
   }}
-
   .tc-header {{
-    display:flex; align-items:center; gap:12px; margin-bottom:12px;
+    display:flex; align-items:center; gap:10px; margin-bottom:8px;
   }}
   .tc-icon {{
-    width:48px; height:48px; border-radius:14px;
+    width:38px; height:38px; border-radius:10px;
     display:flex; align-items:center; justify-content:center;
-    font-size:24px;
+    font-size:20px;
     background:{"#1e293b" if is_dark else "#eef3ff"};
-    flex:0 0 48px;
+    flex:0 0 38px;
   }}
-  .tc-title {{ font-size:20px; font-weight:900; color:var(--text); margin:0; }}
-  .tc-sub   {{ font-size:13px; color:var(--muted); margin:2px 0 0 0; }}
-
+  .tc-title {{ font-size:16px; font-weight:900; color:var(--text); margin:0; }}
+  .tc-sub   {{ font-size:11px; color:var(--muted); margin:1px 0 0 0; }}
   .tc-divider {{
-    height:1px; background:var(--border); margin:12px 0;
+    height:1px; background:var(--border); margin:8px 0;
   }}
-
   .tc-bestfor {{
-    font-size:12px; color:var(--muted);
-    margin-bottom:10px;
-    padding:6px 10px;
-    border-radius:8px;
+    font-size:11px; color:var(--muted);
+    margin-bottom:6px;
+    padding:4px 8px;
+    border-radius:6px;
     background:{"rgba(255,255,255,0.03)" if is_dark else "rgba(13,110,253,0.05)"};
     border:1px solid var(--border);
   }}
-
   .tc-features {{
-    font-size:13px; line-height:2.0; color:var(--text);
+    font-size:12px; line-height:1.75; color:var(--text);
     margin:0; padding:0; list-style:none;
   }}
 
   /* ── Badges ── */
   .badge {{
-    display:inline-block; padding:4px 10px;
-    border-radius:999px; font-size:11px; font-weight:800;
+    display:inline-block; padding:2px 8px;
+    border-radius:999px; font-size:10px; font-weight:800;
     border:1px solid var(--border);
     background:rgba(255,255,255,0.04);
     color:var(--text); white-space:nowrap;
@@ -245,21 +240,20 @@ html(f"""
   .badge.purple {{ background:rgba(124,58,237,0.16);  border-color:rgba(124,58,237,0.28);  color:{"#ddd6fe" if is_dark else "#5b21b6"}; }}
   .badge.gray   {{ background:rgba(255,255,255,0.04); }}
   .badge.orange {{ background:rgba(253,126,20,0.16);  border-color:rgba(253,126,20,0.28);  color:{"#fed8aa" if is_dark else "#7c3500"}; }}
-
-  .badges {{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }}
+  .badges {{ display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px; }}
 
   /* ── Capability card ── */
   .cap-card {{
-    border:1px solid var(--border); border-radius:16px;
-    padding:16px; background:var(--panel); margin-bottom:12px;
+    border:1px solid var(--border); border-radius:12px;
+    padding:12px 14px; background:var(--panel); margin-bottom:8px;
   }}
   .cap-title {{
-    font-size:16px; font-weight:900; color:var(--brand);
-    margin-bottom:10px;
+    font-size:13px; font-weight:900; color:var(--brand);
+    margin-bottom:6px;
   }}
   .cap-item {{
-    font-size:13px; color:var(--text);
-    line-height:2.0; display:flex; align-items:flex-start; gap:6px;
+    font-size:12px; color:var(--text);
+    line-height:1.6; display:flex; align-items:flex-start; gap:5px;
   }}
 
   /* ── Link box ── */
@@ -362,10 +356,10 @@ st.markdown("### 🚀 Available Tools")
 
 card_col1, card_col2, side_col = st.columns([1, 1, 0.65], gap="large")
 
-# ── Tool cards ──
+# ── Tool cards — COMPACT render_card ──
 def render_card(tool_key: str, col):
-    t      = TOOLS[tool_key]
-    is_sel = (selected == tool_key)
+    t       = TOOLS[tool_key]
+    is_sel  = (selected == tool_key)
     last_ts = st.session_state["last_launched_at"].get(tool_key)
     ok, missing = check_deps(t.get("deps", []))
 
@@ -374,15 +368,24 @@ def render_card(tool_key: str, col):
         if ok else
         f"<span class='badge red'>❌ missing: {', '.join(missing)}</span>"
     )
-    sel_badge    = "<span class='badge green'>Selected</span>" if is_sel else ""
-    tag_color    = t.get("tag_color", "blue")
-    tag_label    = t.get("tag", "")
-    feat_count   = t.get("feature_count", "")
+    sel_badge  = "<span class='badge green'>Selected</span>" if is_sel else ""
+    tag_color  = t.get("tag_color", "blue")
+    tag_label  = t.get("tag", "")
+    feat_count = t.get("feature_count", "")
 
-    features_html = "".join(
-        f"<li class='cap-item'>{f}</li>"
-        for f in t["features"]
-    )
+    # Show first 5 features; rest hidden under collapsible
+    all_feats  = t["features"]
+    top_feats  = all_feats[:5]
+    more_feats = all_feats[5:]
+
+    top_html  = "".join(f"<li class='tc-features' style='list-style:none;font-size:12px;line-height:1.75;color:var(--text);'>{f}</li>" for f in top_feats)
+    more_html = "".join(f"<li style='list-style:none;font-size:12px;line-height:1.75;color:var(--text);'>{f}</li>" for f in more_feats)
+    more_block = (
+        f"<details style='margin-top:4px;'>"
+        f"<summary style='font-size:11px;color:var(--muted);cursor:pointer;list-style:none;'>+ {len(more_feats)} more features</summary>"
+        f"<ul style='padding:0;margin:4px 0 0 0;'>{more_html}</ul>"
+        f"</details>"
+    ) if more_feats else ""
 
     card_cls = "tool-card selected" if is_sel else "tool-card"
 
@@ -407,19 +410,16 @@ def render_card(tool_key: str, col):
         🎯 <b>Best for:</b> {t['best_for']}
       </div>
       <div class="tc-divider"></div>
-      <ul class="tc-features">
-        {features_html}
+      <ul style="padding:0; margin:0;">
+        {top_html}
       </ul>
-      <div class="tc-divider"></div>
-      <div style="font-size:11px; color:var(--muted);">
-        <b>Path:</b> {t['path']}
-      </div>
+      {more_block}
     </div>
     """
 
     with col:
         st.markdown(card_html, unsafe_allow_html=True)
-        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
         if st.button(f"Select {t['name']}", key=f"select_{tool_key}", use_container_width=True):
             st.session_state["selected_tool"] = tool_key
             st.session_state["launched"]      = False
@@ -441,14 +441,19 @@ with side_col:
         <li class="cap-item">🧠 COALESCE key logic</li>
         <li class="cap-item">🟡 Duplicate detection + handling</li>
         <li class="cap-item">📊 Before vs After dup comparison</li>
-        <li class="cap-item">🔍 Search Loan Account Number</li>
-        <li class="cap-item">🧹 Filter-based subset reco</li>
-        <li class="cap-item">📋 Common / selected column compare</li>
-        <li class="cap-item">📄 PDF Summary Report</li>
-        <li class="cap-item">💾 Excel + CSV + ZIP outputs</li>
-        <li class="cap-item">🔒 Local machine processing</li>
-        <li class="cap-item">🛡️ Data never leaves machine</li>
       </ul>
+      <details style="margin-top:4px;">
+        <summary style="font-size:11px;color:var(--muted);cursor:pointer;list-style:none;">+ 7 more capabilities</summary>
+        <ul style="padding:0; margin:4px 0 0 0; list-style:none;">
+          <li class="cap-item">🔍 Search Loan Account Number</li>
+          <li class="cap-item">🧹 Filter-based subset reco</li>
+          <li class="cap-item">📋 Common / selected column compare</li>
+          <li class="cap-item">📄 PDF Summary Report</li>
+          <li class="cap-item">💾 Excel + CSV + ZIP outputs</li>
+          <li class="cap-item">🔒 Local machine processing</li>
+          <li class="cap-item">🛡️ Data never leaves machine</li>
+        </ul>
+      </details>
     </div>
     """)
 
@@ -738,9 +743,21 @@ else:
     tool_key = st.session_state["selected_tool"]
     try:
         if tool_key == "tool1":
-            exec(open(str(BASE / "app.py")).read(), {"__name__": "__main__"})
+            # ✅ FIX: pass full globals so exec'd code has builtins + correct __name__
+            _globals = globals().copy()
+            _globals["__name__"] = "__main__"
+            exec(
+                open(str(BASE / "app.py"), encoding="utf-8").read(),
+                _globals
+            )
         elif tool_key == "tool2":
-            exec(open(str(BASE / "app_v2.py")).read(), {"__name__": "__main__"})
+            # ✅ FIX: pass full globals so exec'd code has builtins + correct __name__
+            _globals = globals().copy()
+            _globals["__name__"] = "__main__"
+            exec(
+                open(str(BASE / "app_v2.py"), encoding="utf-8").read(),
+                _globals
+            )
     except SystemExit:
         pass
     except Exception as e:

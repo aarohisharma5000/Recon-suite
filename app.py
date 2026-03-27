@@ -122,14 +122,74 @@ def normalize_cols(df: pd.DataFrame) -> pd.DataFrame:
     def _norm(c):
         c = str(c)
         c = c.replace("\u00A0", " ")   # NBSP
-        c = c.replace("\u200B", "")   # zero-width
+        c = c.replace("\u200B", "")    # zero-width
         c = c.replace("\n", " ").replace("\r", " ")
         c = c.strip()
         c = re.sub(r"\s+", " ", c)    # collapse multi spaces
         return c
 
     df.columns = [_norm(c) for c in df.columns]
+
+    # ✅ FIX: dedup column names AFTER normalizing
+    seen = {}
+    new_cols = []
+    for c in df.columns:
+        if c not in seen:
+            seen[c] = 1
+            new_cols.append(c)
+        else:
+            seen[c] += 1
+            new_cols.append(f"{c}__{seen[c]}")
+    df.columns = new_cols
+
     return df
+
+
+def _dedup_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    ✅ FIX 1: Make duplicate column names unique.
+    e.g. ['BCF %', 'BCF %'] → ['BCF %', 'BCF %__2']
+    """
+    seen = {}
+    new_cols = []
+    for c in df.columns:
+        if c not in seen:
+            seen[c] = 1
+            new_cols.append(c)
+        else:
+            seen[c] += 1
+            new_cols.append(f"{c}__{seen[c]}")
+    df.columns = new_cols
+    return df
+
+
+def _fix_mixed_types(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    ✅ FIX 2: Convert columns with mixed types (e.g. datetime.time, datetime.date)
+    to plain strings so pyarrow / Streamlit dataframe display doesn't crash.
+    """
+    for col in df.columns:
+        if df[col].dtype == object:
+            try:
+                # Check if any value is a datetime.time or datetime.date object
+                sample = df[col].dropna().head(100)
+                has_time = any(
+                    hasattr(v, 'hour') or hasattr(v, 'year')
+                    for v in sample
+                    if not isinstance(v, str)
+                )
+                if has_time:
+                    df[col] = df[col].astype(str)
+            except Exception:
+                pass
+        # Also convert any remaining problematic object columns to str safely
+        try:
+            import pyarrow as pa
+            pa.array(df[col].values)
+        except Exception:
+            df[col] = df[col].astype(str)
+    return df
+
 
 def read_file_once(uploaded_file) -> pd.DataFrame:
     """
@@ -143,11 +203,13 @@ def read_file_once(uploaded_file) -> pd.DataFrame:
 
     if name.endswith(".csv"):
         df = pd.read_csv(bio)
+        df = _dedup_columns(df)      # ✅ FIX 1
+        df = _fix_mixed_types(df)    # ✅ FIX 2
         df["_SHEET"] = "CSV"
         return df
 
     elif name.endswith((".xlsx", ".xls")):
-        sheets = pd.read_excel(bio, sheet_name=None)  # {sheet: df}
+        sheets = pd.read_excel(bio, sheet_name=None)
         best_sheet, best_df, best_rows = None, None, -1
         for sh, dfx in sheets.items():
             if dfx is None:
@@ -158,6 +220,8 @@ def read_file_once(uploaded_file) -> pd.DataFrame:
                 best_sheet = sh
                 best_df = dfx
         best_df = best_df if best_df is not None else pd.DataFrame()
+        best_df = _dedup_columns(best_df)    # ✅ FIX 1
+        best_df = _fix_mixed_types(best_df)  # ✅ FIX 2
         best_df["_SHEET"] = str(best_sheet) if best_sheet is not None else "UNKNOWN"
         return best_df
 
@@ -173,12 +237,14 @@ def read_file_once(uploaded_file) -> pd.DataFrame:
                 best_sheet = sh
                 best_df = dfx
         best_df = best_df if best_df is not None else pd.DataFrame()
+        best_df = _dedup_columns(best_df)    # ✅ FIX 1
+        best_df = _fix_mixed_types(best_df)  # ✅ FIX 2
         best_df["_SHEET"] = str(best_sheet) if best_sheet is not None else "UNKNOWN"
         return best_df
 
     else:
         raise ValueError("Unsupported file type. Upload CSV / XLSX / XLSB.")
-
+    
 def read_many(files):
     """
     Combine many files into ONE dataframe (append rows).
@@ -368,13 +434,17 @@ KEY_CANDIDATES_PRIORITY = [
     "customer id",
     "loan id",
     "lender account number",
+    "Transaction Id"
+    "Transaction id"
+    "TransactionId"
+    "TransactionID"
 ]
 
 # Smart key suggestion (scans column names, returns best-guess key cols)
 _KEY_HINTS = [
     "lenderloanaccountnumber", "loanaccountnumber", "loanacctnumber",
     "loanaccnumber", "lan", "accountnumber", "loanid", "lenderaccountnumber",
-    "customerid", "borrowerid", "accountid",
+    "customerid", "borrowerid", "accountid","Transaction Id"
 ]
 
 def suggest_key_candidates(cols: list, top_k: int = 5) -> list:
@@ -1014,6 +1084,125 @@ with cA:
 with cB:
     st.write("File 2 side: files missing any of the matched columns")
     st.dataframe(miss_cols_f2, use_container_width=True, hide_index=True)
+
+# ============================================================
+# ✅ 0.5) COLUMN MAPPING — map unmatched columns across files
+# ============================================================
+
+st.markdown("### 🔀 Column Mapping (optional)")
+
+# Find unmatched columns
+_unmatched_f1 = sorted([c for c in df1.columns if c not in internal_cols and c not in matched_cols])
+_unmatched_f2 = sorted([c for c in df2.columns if c not in internal_cols and c not in matched_cols])
+
+if not _unmatched_f1 and not _unmatched_f2:
+    # All columns already match — no mapping needed
+    st.success("✅ All columns match perfectly — no mapping needed!")
+    st.session_state["col_mapping"] = {}
+else:
+    # Show checkbox — mapping UI only appears when ticked
+    _mapping_enabled = st.checkbox(
+        f"🔀 Enable Column Mapping  ({len(_unmatched_f1)} unmatched in File 1 | {len(_unmatched_f2)} unmatched in File 2)",
+        value=False,
+        key="mapping_enabled"
+    )
+
+    if not _mapping_enabled:
+        # ✅ Checkbox OFF — hide everything, clear any old mapping
+        st.caption("💡 Tick above if your files have the same data under different column names.")
+        st.session_state["col_mapping"] = {}
+
+    else:
+        # ✅ Checkbox ON — show full mapping UI
+        st.caption("Map File 1 columns → File 2 columns. Leave as '— Skip —' to ignore.")
+
+        # Auto-suggest obvious matches by normalized name
+        def _auto_suggest(cols_f1, cols_f2):
+            def _n(c):
+                return re.sub(r"[^a-z0-9]+", "", str(c).strip().lower())
+            f2_norm = {_n(c): c for c in cols_f2}
+            return {c1: f2_norm[_n(c1)] for c1 in cols_f1 if _n(c1) in f2_norm}
+
+        _auto = _auto_suggest(_unmatched_f1, _unmatched_f2)
+
+        # Reset mapping if files changed
+        if st.session_state.get("col_mapping_sig") != str(sig):
+            st.session_state["col_mapping_sig"] = str(sig)
+            st.session_state["col_mapping"] = _auto.copy()
+
+        if _auto:
+            st.success(f"✅ Auto-suggested {len(_auto)} mapping(s) based on similar names.")
+
+        st.info(
+            f"📊 **{len(matched_cols)}** already matched | "
+            f"**{len(_unmatched_f1)}** unmatched in File 1 | "
+            f"**{len(_unmatched_f2)}** unmatched in File 2"
+        )
+
+        st.markdown("#### Map File 1 → File 2")
+        _f2_options = ["— Skip —"] + _unmatched_f2
+        _new_mapping = {}
+
+        for i, f1_col in enumerate(_unmatched_f1):
+            _ca, _cb, _cc = st.columns([2, 0.3, 2])
+            with _ca:
+                st.markdown(
+                    f"<div style='padding:6px 10px;background:#eef3ff;border-radius:8px;"
+                    f"font-size:13px;font-weight:600;color:#0b5ed7;border:1px solid #c8d8f8;'>"
+                    f"📄 {f1_col}</div>",
+                    unsafe_allow_html=True
+                )
+            with _cb:
+                st.markdown("<div style='text-align:center;padding-top:6px;font-size:18px;'>→</div>", unsafe_allow_html=True)
+            with _cc:
+                _cur = st.session_state["col_mapping"].get(f1_col, _auto.get(f1_col, "— Skip —"))
+                _idx = _f2_options.index(_cur) if _cur in _f2_options else 0
+                _sel = st.selectbox(
+                    "Map to",
+                    options=_f2_options,
+                    index=_idx,
+                    key=f"colmap_{i}_{f1_col}",
+                    label_visibility="collapsed"
+                )
+                if _sel != "— Skip —":
+                    _new_mapping[f1_col] = _sel
+
+            st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
+
+        st.session_state["col_mapping"] = _new_mapping
+
+        if _new_mapping:
+            st.markdown("#### ✅ Active Mappings")
+            st.dataframe(
+                pd.DataFrame([{"File 1 Column": k, "→": "→", "File 2 Column": v} for k, v in _new_mapping.items()]),
+                use_container_width=True, hide_index=True
+            )
+            st.caption(f"✅ {len(_new_mapping)} column(s) mapped — will be reconciled together.")
+        else:
+            st.info("No mappings set yet. Use the dropdowns above to map columns.")
+
+# ============================================================
+# ✅ Apply column mapping to df2 (always runs — empty mapping = no change)
+# ============================================================
+col_mapping = st.session_state.get("col_mapping", {})
+
+if col_mapping:
+    _rename_map = {v: k for k, v in col_mapping.items()}
+    df2 = df2.rename(columns=_rename_map)
+    st.session_state["df2"] = df2
+
+    # Recompute matched cols after mapping
+    common_cols = sorted(list(set(df1.columns).intersection(set(df2.columns))))
+    matched_cols = [c for c in common_cols if c not in internal_cols]
+
+    st.success(
+        f"✅ Mapping applied! Matched columns: **{len(matched_cols)}** total "
+        f"({len(matched_cols) - len([c for c in matched_cols if c not in _unmatched_f1])} original + {len(col_mapping)} mapped)"
+    )
+
+
+
+
 
 # -----------------------------
 # Preview (combined)

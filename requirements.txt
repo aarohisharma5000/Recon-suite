@@ -10,3 +10,5 @@ python-dateutil
 tzdata
 reportlab
 xlrd>=2.0.1
+gspread
+google-auth

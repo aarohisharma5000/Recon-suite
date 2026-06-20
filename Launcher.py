@@ -16,6 +16,48 @@ def app_base_dir() -> Path:
 BASE_DIR = app_base_dir()
 
 st.set_page_config(page_title="Reco Suite Launcher", layout="wide")
+# ═══════════════════════════════════════════
+# AUTH GATE
+# ═══════════════════════════════════════════
+import gspread
+from google.oauth2.service_account import Credentials
+from datetime import date
+
+# Step A — Check subscriber sheet
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+creds  = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=SCOPES)
+gc     = gspread.authorize(creds)
+sheet  = gc.open_by_key(st.secrets["SHEET_ID"]).sheet1
+rows   = sheet.get_all_records()
+
+# Step B — Get user email via query param (temporary, no OAuth needed yet)
+user_email = st.query_params.get("email", "")
+
+if not user_email:
+    st.error("❌ Access denied. Please use your subscription link to open this app.")
+    st.info("📧 Contact aarohisharma5000@gmail.com to get your access link.")
+    st.stop()
+
+# Step C — Check if email is in subscriber sheet
+user_row = next((r for r in rows if str(r.get("email","")).strip().lower() == user_email.strip().lower()), None)
+
+if not user_row:
+    st.error(f"❌ {user_email} is not subscribed. Please purchase access.")
+    st.stop()
+
+expiry = date.fromisoformat(str(user_row["expiry_date"]))
+if expiry < date.today():
+    st.error(f"⏰ Subscription expired on {expiry}. Please renew.")
+    st.stop()
+
+# Step D — Set plan
+st.session_state["user_plan"]  = user_row.get("plan", "free")
+st.session_state["user_email"] = user_email
+ROW_LIMITS = {"free": 10000, "starter": 250000, "pro": 9999999}
+st.session_state["row_limit"]  = ROW_LIMITS.get(st.session_state["user_plan"], 10000)
+# ═══════════════════════════════════════════
+# AUTH PASSED
+# ═══════════════════════════════════════════
 
 BASE   = BASE_DIR
 ASSETS = BASE / "assets"
